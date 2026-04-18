@@ -1,0 +1,152 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  background: #050d1a;
+  color: #fff;
+  overflow-x: hidden;
+}
+
+/* ═══ SCROLLBAR ═══ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0a1628; }
+::-webkit-scrollbar-thumb { background: #c9a84c; border-radius: 3px; }
+
+/* ═══ MOBILE — 768px पेक्षा कमी ═══ */
+@media (max-width: 768px) {
+  /* Sidebar लपवा */
+  .sidebar { display: none !important; }
+
+  /* Main content full width */
+  .main-content {
+    padding: 70px 12px 70px !important;
+    width: 100% !important;
+  }
+
+  /* Cards — 2 columns mobile वर */
+  .card-row {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+
+  /* Table — horizontal scroll */
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 600px;
+  }
+
+  /* Machine Grid — 1 column */
+  .machine-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Calc Grid — 1 column */
+  .calc-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Modal — full width */
+  .modal {
+    width: 95% !important;
+    padding: 20px !important;
+  }
+
+  /* Header */
+  .page-header {
+    flex-direction: column !important;
+    gap: 10px !important;
+    align-items: flex-start !important;
+  }
+
+  .header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  /* Bottom Row — 1 column */
+  .bottom-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Rate Card */
+  .rate-grid {
+    flex-wrap: wrap !important;
+  }
+
+  /* Tracking Stats */
+  .tracking-stats {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  /* Type Grid */
+  .type-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Wallet Page */
+  .wallet-main {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* Quick Amounts */
+  .quick-amts {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Font sizes */
+  h2 { font-size: 16px !important; }
+  h3 { font-size: 14px !important; }
+
+  /* Page title */
+  .page-title { font-size: 16px !important; }
+
+  /* Card numbers */
+  .card-number { font-size: 18px !important; }
+
+  /* Hide some columns on mobile */
+  .hide-mobile { display: none !important; }
+}
+
+/* ═══ TABLET — 768px to 1024px ═══ */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .sidebar { display: none !important; }
+
+  .main-content {
+    padding: 70px 16px 70px !important;
+    width: 100% !important;
+  }
+
+  .card-row {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+
+  .machine-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .bottom-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .tracking-stats {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+/* ═══ INPUT TOUCH FRIENDLY ═══ */
+@media (max-width: 1024px) {
+  input, select, textarea, button {
+    font-size: 16px !important; /* iOS zoom fix */
+    touch-action: manipulation;
+  }
+
+  select { font-size: 16px !important; }
+}
