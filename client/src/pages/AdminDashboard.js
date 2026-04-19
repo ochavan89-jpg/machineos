@@ -7,6 +7,17 @@ import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { getMachines, getAllBookings, getAllUsers, getAllTransactions, getAllIssues } from '../supabaseService';
 
+const NAV = [
+  { id: 'overview', icon: String.fromCodePoint(0x1F4CA), label: 'Overview' },
+  { id: 'machines', icon: String.fromCodePoint(0x1F69C), label: 'Machines' },
+  { id: 'clients', icon: String.fromCodePoint(0x1F477), label: 'Clients' },
+  { id: 'owners', icon: String.fromCodePoint(0x1F3D7), label: 'Owners' },
+  { id: 'operators', icon: String.fromCodePoint(0x1F527), label: 'Operators' },
+  { id: 'wallet', icon: String.fromCodePoint(0x1F4B3), label: 'Wallet & Billing' },
+  { id: 'reports', icon: String.fromCodePoint(0x1F4C8), label: 'Reports' },
+  { id: 'iot', icon: String.fromCodePoint(0x1F4E1), label: 'IoT & GPS' },
+];
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { t } = useLanguage(); // eslint-disable-line
@@ -50,16 +61,7 @@ const AdminDashboard = () => {
   const commission = Math.round(totalRevenue * 0.15);
   const lowFuelMachines = machineData.filter(m => (m.fuel_level || 0) < 30);
 
-  const NAV = [
-  { id: 'overview', icon: String.fromCodePoint(0x1F4CA), label: 'Overview' },
-  { id: 'machines', icon: String.fromCodePoint(0x1F69C), label: 'Machines' },
-  { id: 'clients', icon: String.fromCodePoint(0x1F477), label: 'Clients' },
-  { id: 'owners', icon: String.fromCodePoint(0x1F3D7), label: 'Owners' },
-  { id: 'operators', icon: String.fromCodePoint(0x1F527), label: 'Operators' },
-  { id: 'wallet', icon: String.fromCodePoint(0x1F4B3), label: 'Wallet & Billing' },
-  { id: 'reports', icon: String.fromCodePoint(0x1F4C8), label: 'Reports' },
-  { id: 'iot', icon: String.fromCodePoint(0x1F4E1), label: 'IoT & GPS' },
-];
+  
 
   const isSmall = isMobile || isTablet;
 
