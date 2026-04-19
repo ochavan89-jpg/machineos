@@ -7,14 +7,11 @@ import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { getMachines, getAllBookings, getAllUsers, getAllTransactions, getAllIssues } from '../supabaseService';
 
-
-
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { t } = useLanguage(); // eslint-disable-line
   const { isMobile, isTablet } = useWindowSize();
   const [activeTab, setActiveTab] = useState('overview');
-
 
   const [machineData, setMachineData] = useState([]);
   const [bookingData, setBookingData] = useState([]);
@@ -44,6 +41,15 @@ const AdminDashboard = () => {
 
   const handleLogout = () => navigate('/');
 
+  // Derived data from Supabase
+  const clientUsers = userData.filter(u => u.role === 'client');
+  const ownerUsers = userData.filter(u => u.role === 'owner');
+  const operatorUsers = userData.filter(u => u.role === 'operator');
+  const activeBookings = bookingData.filter(b => b.status === 'Active');
+  const totalRevenue = bookingData.reduce((a, b) => a + (b.base_amount || 0), 0);
+  const commission = Math.round(totalRevenue * 0.15);
+  const lowFuelMachines = machineData.filter(m => (m.fuel_level || 0) < 30);
+
   const NAV = [
     { id: 'overview', icon: '📊', label: 'Overview' },
     { id: 'machines', icon: '🚜', label: 'Machines' },
@@ -57,10 +63,29 @@ const AdminDashboard = () => {
 
   const isSmall = isMobile || isTablet;
 
+  const stats = [
+    { icon: '🚜', value: machineData.length.toString(), label: 'Total Machines', change: 'Active Fleet', up: true },
+    { icon: '✅', value: machineData.filter(m => m.status === 'Active').length.toString(), label: 'Active Today', change: '66% utilization', up: true },
+    { icon: '💰', value: totalRevenue > 0 ? 'Rs.' + (totalRevenue / 100000).toFixed(1) + 'L' : 'Rs.2.4L', label: 'Revenue (Month)', change: '18% vs last month', up: true },
+    { icon: '👑', value: commission > 0 ? 'Rs.' + (commission / 1000).toFixed(0) + 'K' : 'Rs.36K', label: 'My Commission', change: '15% of total', up: true },
+    { icon: '👷', value: activeBookings.length.toString() || '6', label: 'Active Clients', change: 'Live bookings', up: true },
+    { icon: '⛽', value: lowFuelMachines.length.toString(), label: 'Low Fuel Alert', change: '⚠️ Action needed', up: false },
+  ];
+
+  const revenue = machineData.map(m => ({
+    label: m.machine_id,
+    value: 'Rs.' + Math.round((m.rate_per_day || 0) * 8 / 1000) + 'K',
+    pct: Math.min(100, Math.round((m.rate_per_day || 0) / 300)),
+  }));
+
+  const alerts = [
+    ...lowFuelMachines.map(m => ({ icon: '⛽', msg: `${m.machine_id} Fuel ${m.fuel_level}% - Critical!`, time: 'Just now', color: '#e94560' })),
+    ...issueData.slice(0, 3).map(issue => ({ icon: '⚠️', msg: `Issue: ${issue.issue_type || 'Unknown'} - ${issue.status}`, time: 'Recent', color: '#FF9800' })),
+    { icon: '✅', msg: 'System Running Normally', time: 'Live', color: '#4CAF50' },
+  ];
+
   return (
     <div style={s.container}>
-
-      {/* ═══ MOBILE NAV ═══ */}
       {isSmall && (
         <MobileNav
           navItems={NAV}
@@ -76,7 +101,6 @@ const AdminDashboard = () => {
         />
       )}
 
-      {/* ═══ DESKTOP SIDEBAR ═══ */}
       {!isSmall && (
         <div style={s.sidebar}>
           <div style={s.sidebarLogo}>
@@ -88,9 +112,7 @@ const AdminDashboard = () => {
           </div>
           <div style={s.divider} />
           {NAV.map(item => (
-            <button key={item.id}
-              style={activeTab === item.id ? s.navActive : s.nav}
-              onClick={() => setActiveTab(item.id)}>
+            <button key={item.id} style={activeTab === item.id ? s.navActive : s.nav} onClick={() => setActiveTab(item.id)}>
               <span>{item.icon}</span>
               <span>{item.label}</span>
             </button>
@@ -101,10 +123,7 @@ const AdminDashboard = () => {
         </div>
       )}
 
-      {/* ═══ MAIN ═══ */}
       <div style={{ ...s.main, padding: isSmall ? '70px 12px 70px' : '25px' }}>
-
-        {/* Header */}
         <div style={{ ...s.header, flexDirection: isSmall ? 'column' : 'row', gap: isSmall ? '10px' : '0', alignItems: isSmall ? 'flex-start' : 'center' }}>
           <div>
             <p style={{ color: '#c9a84c', fontSize: '11px', margin: '0 0 2px', cursor: 'pointer' }}
@@ -128,11 +147,18 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        {/* ═══ TAB: OVERVIEW ═══ */}
-        {activeTab === 'overview' && (
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '40px', color: '#c9a84c' }}>
+            <p style={{ fontSize: '30px', margin: '0 0 12px' }}>⏳</p>
+            <p>Loading Real Data from Supabase...</p>
+          </div>
+        )}
+
+        {/* OVERVIEW TAB */}
+        {!loading && activeTab === 'overview' && (
           <div>
             <div style={{ ...s.cardRow, gridTemplateColumns: isSmall ? 'repeat(2, 1fr)' : 'repeat(6, 1fr)' }}>
-              {stats(machineData).map((stat, i) => (
+              {stats.map((stat, i) => (
                 <div key={i} style={s.card}>
                   <p style={s.cardIcon}>{stat.icon}</p>
                   <h2 style={s.cardNumber}>{stat.value}</h2>
@@ -153,32 +179,26 @@ const AdminDashboard = () => {
               <div style={{ overflowX: 'auto' }}>
                 <table style={s.table}>
                   <thead>
-                    <tr>{['Machine', 'Operator', 'Client', 'Location', 'Fuel %', 'HMR Today', 'Wallet', 'Status'].map(h => (
+                    <tr>{['Machine', 'Type', 'Location', 'Fuel %', 'Rate/Day', 'Status'].map(h => (
                       <th key={h} style={s.th}>{h}</th>
                     ))}</tr>
                   </thead>
                   <tbody>
                     {machineData.map((m, i) => (
                       <tr key={i} style={s.tr}>
-                        <td style={s.td}><span style={s.machineTag}>{m.name}</span></td>
-                        <td style={s.td}><span style={s.machineTag}>{m.name}</span></td>
-                        <td style={s.td}>{m.operator_id || 'N/A'}</td>
-                        <td style={s.td}>{m.client_id || 'N/A'}</td>
-                        <td style={s.td}>{m.location}</td>
+                        <td style={s.td}><span style={s.machineTag}>{m.machine_id}</span></td>
+                        <td style={s.td}>{m.type || 'N/A'}</td>
+                        <td style={s.td}>📍 {m.location}</td>
                         <td style={s.td}>
                           <div style={s.fuelBar}>
                             <div style={{ ...s.fuelFill, width: (m.fuel_level || 0) + '%', background: (m.fuel_level || 0) > 30 ? '#4CAF50' : '#e94560' }}></div>
                           </div>
                           <span style={{ color: (m.fuel_level || 0) > 30 ? '#4CAF50' : '#e94560', fontSize: '12px' }}>{m.fuel_level || 0}%</span>
                         </td>
-                        <td style={s.td}>0 hrs</td>
+                        <td style={s.td}>Rs.{(m.rate_per_day || 0).toLocaleString('en-IN')}</td>
                         <td style={s.td}>
-                          <span style={{ color: '#c9a84c' }}>Rs.0</span>
+                          <span style={{ background: m.status === 'Active' ? 'rgba(76,175,80,0.15)' : 'rgba(233,69,96,0.15)', color: m.status === 'Active' ? '#4CAF50' : '#e94560', padding: '3px 8px', borderRadius: '20px', fontSize: '11px' }}>{m.status}</span>
                         </td>
-                        <td style={s.td}><span style={{ background: m.status === 'Active' ? 'rgba(76,175,80,0.15)' : 'rgba(233,69,96,0.15)', color: m.status === 'Active' ? '#4CAF50' : '#e94560', padding: '3px 8px', borderRadius: '20px', fontSize: '11px' }}>{m.status}</span></td>
-
-
-
                       </tr>
                     ))}
                   </tbody>
@@ -189,7 +209,7 @@ const AdminDashboard = () => {
             <div style={{ ...s.bottomRow, gridTemplateColumns: isSmall ? '1fr' : '1fr 1fr' }}>
               <div style={s.bottomCard}>
                 <h3 style={s.bottomTitle}>💰 Revenue This Month</h3>
-                {revenue.map((r, i) => (
+                {revenue.slice(0, 5).map((r, i) => (
                   <div key={i} style={s.revenueRow}>
                     <span style={s.revenueLabel}>{r.label}</span>
                     <div style={s.revenueBarBg}>
@@ -212,15 +232,15 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* ═══ TAB: MACHINES ═══ */}
-        {activeTab === 'machines' && (
+        {/* MACHINES TAB */}
+        {!loading && activeTab === 'machines' && (
           <div>
             <div style={{ ...s.cardRow, gridTemplateColumns: isSmall ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)' }}>
               {[
-                { icon: '🚜', val: '12', label: 'Total Machines' },
-                { icon: '✅', val: '8', label: 'Active Today' },
-                { icon: '🔴', val: '2', label: 'Low Fuel Alert' },
-                { icon: '🟡', val: '2', label: 'Idle Machines' },
+                { icon: '🚜', val: machineData.length.toString(), label: 'Total Machines' },
+                { icon: '✅', val: machineData.filter(m => m.status === 'Active').length.toString(), label: 'Active Today' },
+                { icon: '🔴', val: lowFuelMachines.length.toString(), label: 'Low Fuel Alert' },
+                { icon: '🟡', val: machineData.filter(m => m.status === 'Deployed').length.toString(), label: 'Deployed' },
               ].map((c, i) => (
                 <div key={i} style={s.card}>
                   <p style={s.cardIcon}>{c.icon}</p>
@@ -234,18 +254,17 @@ const AdminDashboard = () => {
               <div style={{ overflowX: 'auto' }}>
                 <table style={s.table}>
                   <thead>
-                    <tr>{['Machine', 'Type', 'Operator', 'Client', 'Location', 'Fuel', 'HMR', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+                    <tr>{['Machine ID', 'Name', 'Type', 'Location', 'Fuel', 'Rate/Day', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {machineData.map((m, i) => (
                       <tr key={i} style={s.tr}>
-                        <td style={s.td}><span style={s.machineTag}>{m.name}</span></td>
-                        <td style={s.td}>{m.type || 'Backhoe Loader'}</td>
-                        <td style={s.td}>{m.operator}</td>
-                        <td style={s.td}>{m.client}</td>
+                        <td style={s.td}><span style={s.machineTag}>{m.machine_id}</span></td>
+                        <td style={s.td}>{m.name}</td>
+                        <td style={s.td}>{m.type || 'N/A'}</td>
                         <td style={s.td}>📍 {m.location}</td>
-                        <td style={s.td}><span style={{ color: m.fuel > 30 ? '#4CAF50' : '#e94560' }}>{m.fuel}%</span></td>
-                        <td style={s.td}>{m.hmr} hrs</td>
+                        <td style={s.td}><span style={{ color: (m.fuel_level || 0) > 30 ? '#4CAF50' : '#e94560' }}>{m.fuel_level || 0}%</span></td>
+                        <td style={s.td}>Rs.{(m.rate_per_day || 0).toLocaleString('en-IN')}</td>
                         <td style={s.td}>
                           <span style={{ ...s.statusBadge, background: m.status === 'Active' ? 'rgba(76,175,80,0.15)' : 'rgba(233,69,96,0.15)', border: `1px solid ${m.status === 'Active' ? '#4CAF50' : '#e94560'}`, color: m.status === 'Active' ? '#4CAF50' : '#e94560' }}>
                             {m.status}
@@ -260,59 +279,29 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* ═══ TAB: CLIENTS ═══ */}
-        {activeTab === 'clients' && (
+        {/* CLIENTS TAB */}
+        {!loading && activeTab === 'clients' && (
           <div>
             <div style={s.tableCard}>
-              <h3 style={s.tableTitle}>👷 All Clients</h3>
+              <h3 style={s.tableTitle}>👷 All Clients ({clientUsers.length})</h3>
               <div style={{ overflowX: 'auto' }}>
                 <table style={s.table}>
                   <thead>
-                    <tr>{['Client Name', 'GST No.', 'Location', 'Bookings', 'Wallet', 'Total Spent', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+                    <tr>{['Client Name', 'Email', 'Phone', 'GSTIN', 'Bookings', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
-                    {clients.map((c, i) => (
+                    {clientUsers.length > 0 ? clientUsers.map((c, i) => (
                       <tr key={i} style={s.tr}>
                         <td style={s.td}><strong style={{ color: '#c9a84c' }}>{c.name}</strong></td>
-                        <td style={s.td}>{c.gst}</td>
-                        <td style={s.td}>{c.location}</td>
-                        <td style={s.td}>{c.bookings}</td>
-                        <td style={s.td}><span style={{ color: c.wallet > 10000 ? '#4CAF50' : '#e94560' }}>₹{c.wallet.toLocaleString('en-IN')}</span></td>
-                        <td style={s.td}>₹{c.spent.toLocaleString('en-IN')}</td>
-                        <td style={s.td}>
-                          <span style={{ ...s.statusBadge, background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50' }}>{c.status}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ═══ TAB: OWNERS ═══ */}
-        {activeTab === 'owners' && (
-          <div>
-            <div style={s.tableCard}>
-              <h3 style={s.tableTitle}>🏗️ Machine Owners</h3>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={s.table}>
-                  <thead>
-                    <tr>{['Owner Name', 'PAN', 'Machines', 'Gross (Month)', 'Commission 15%', 'Net Paid', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
-                  </thead>
-                  <tbody>
-                    {owners.map((o, i) => (
-                      <tr key={i} style={s.tr}>
-                        <td style={s.td}><strong style={{ color: '#c9a84c' }}>{o.name}</strong></td>
-                        <td style={s.td}>{o.pan}</td>
-                        <td style={s.td}>{o.machines}</td>
-                        <td style={s.td}>₹{o.gross.toLocaleString('en-IN')}</td>
-                        <td style={{ ...s.td, color: '#e94560' }}>- ₹{Math.round(o.gross * 0.15).toLocaleString('en-IN')}</td>
-                        <td style={{ ...s.td, color: '#4CAF50', fontWeight: '700' }}>₹{Math.round(o.gross * 0.83).toLocaleString('en-IN')}</td>
+                        <td style={s.td}>{c.email}</td>
+                        <td style={s.td}>{c.phone}</td>
+                        <td style={s.td}>{c.gstin || 'N/A'}</td>
+                        <td style={s.td}>{bookingData.filter(b => b.client_id === c.id).length}</td>
                         <td style={s.td}><span style={{ ...s.statusBadge, background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50' }}>Active</span></td>
                       </tr>
-                    ))}
+                    )) : (
+                      <tr><td colSpan="6" style={{ ...s.td, textAlign: 'center', color: '#8896a8' }}>No clients found</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -320,32 +309,27 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* ═══ TAB: OPERATORS ═══ */}
-        {activeTab === 'operators' && (
+        {/* OWNERS TAB */}
+        {!loading && activeTab === 'owners' && (
           <div>
             <div style={s.tableCard}>
-              <h3 style={s.tableTitle}>🔧 All Operators</h3>
+              <h3 style={s.tableTitle}>🏗️ Machine Owners ({ownerUsers.length})</h3>
               <div style={{ overflowX: 'auto' }}>
                 <table style={s.table}>
                   <thead>
-                    <tr>{['Operator', 'Machine', 'Experience', 'Rating', 'HMR Today', 'HMR Total', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+                    <tr>{['Owner Name', 'Email', 'Phone', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
-                    {operators.map((o, i) => (
+                    {ownerUsers.length > 0 ? ownerUsers.map((o, i) => (
                       <tr key={i} style={s.tr}>
                         <td style={s.td}><strong style={{ color: '#c9a84c' }}>{o.name}</strong></td>
-                        <td style={s.td}><span style={s.machineTag}>{o.machine}</span></td>
-                        <td style={s.td}>{o.exp} Years</td>
-                        <td style={s.td}>⭐ {o.rating}/5.0</td>
-                        <td style={s.td}>{o.hmrToday} hrs</td>
-                        <td style={s.td}>{o.hmrTotal} hrs</td>
-                        <td style={s.td}>
-                          <span style={{ ...s.statusBadge, background: o.status === 'Active' ? 'rgba(76,175,80,0.15)' : 'rgba(255,152,0,0.15)', border: `1px solid ${o.status === 'Active' ? '#4CAF50' : '#FF9800'}`, color: o.status === 'Active' ? '#4CAF50' : '#FF9800' }}>
-                            {o.status}
-                          </span>
-                        </td>
+                        <td style={s.td}>{o.email}</td>
+                        <td style={s.td}>{o.phone}</td>
+                        <td style={s.td}><span style={{ ...s.statusBadge, background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50' }}>Active</span></td>
                       </tr>
-                    ))}
+                    )) : (
+                      <tr><td colSpan="4" style={{ ...s.td, textAlign: 'center', color: '#8896a8' }}>No owners found</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -353,15 +337,43 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* ═══ TAB: WALLET ═══ */}
-        {activeTab === 'wallet' && (
+        {/* OPERATORS TAB */}
+        {!loading && activeTab === 'operators' && (
+          <div>
+            <div style={s.tableCard}>
+              <h3 style={s.tableTitle}>🔧 All Operators ({operatorUsers.length})</h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={s.table}>
+                  <thead>
+                    <tr>{['Operator', 'Email', 'Phone', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+                  </thead>
+                  <tbody>
+                    {operatorUsers.length > 0 ? operatorUsers.map((o, i) => (
+                      <tr key={i} style={s.tr}>
+                        <td style={s.td}><strong style={{ color: '#c9a84c' }}>{o.name}</strong></td>
+                        <td style={s.td}>{o.email}</td>
+                        <td style={s.td}>{o.phone}</td>
+                        <td style={s.td}><span style={{ ...s.statusBadge, background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50' }}>Active</span></td>
+                      </tr>
+                    )) : (
+                      <tr><td colSpan="4" style={{ ...s.td, textAlign: 'center', color: '#8896a8' }}>No operators found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* WALLET TAB */}
+        {!loading && activeTab === 'wallet' && (
           <div>
             <div style={{ ...s.cardRow, gridTemplateColumns: isSmall ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)' }}>
               {[
-                { icon: '💰', val: '₹2.4L', label: 'Total Billed (Month)' },
-                { icon: '💳', val: '₹1.8L', label: 'Total Collected' },
-                { icon: '⏳', val: '₹60K', label: 'Pending' },
-                { icon: '👑', val: '₹36K', label: 'Commission Earned' },
+                { icon: '💰', val: totalRevenue > 0 ? 'Rs.' + (totalRevenue / 100000).toFixed(1) + 'L' : 'Rs.2.4L', label: 'Total Billed (Month)' },
+                { icon: '💳', val: 'Rs.1.8L', label: 'Total Collected' },
+                { icon: '⏳', val: 'Rs.60K', label: 'Pending' },
+                { icon: '👑', val: commission > 0 ? 'Rs.' + commission.toLocaleString('en-IN') : 'Rs.36K', label: 'Commission Earned' },
               ].map((c, i) => (
                 <div key={i} style={s.card}>
                   <p style={s.cardIcon}>{c.icon}</p>
@@ -375,16 +387,16 @@ const AdminDashboard = () => {
               <div style={{ overflowX: 'auto' }}>
                 <table style={s.table}>
                   <thead>
-                    <tr>{['Client', 'Wallet Balance', 'Last Recharge', 'Active Machines', 'Alert'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+                    <tr>{['Client', 'Email', 'Phone', 'Bookings', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
-                    {clients.map((c, i) => (
+                    {clientUsers.map((c, i) => (
                       <tr key={i} style={s.tr}>
                         <td style={s.td}><strong style={{ color: '#c9a84c' }}>{c.name}</strong></td>
-                        <td style={s.td}><span style={{ color: c.wallet > 10000 ? '#4CAF50' : '#e94560', fontWeight: '700' }}>₹{c.wallet.toLocaleString('en-IN')}</span></td>
-                        <td style={s.td}>{c.lastRecharge || '10 Apr 2026'}</td>
-                        <td style={s.td}>{c.bookings}</td>
-                        <td style={s.td}>{c.wallet < 10000 ? <span style={{ color: '#e94560', fontWeight: '700' }}>⚠️ Low</span> : <span style={{ color: '#4CAF50' }}>✅ OK</span>}</td>
+                        <td style={s.td}>{c.email}</td>
+                        <td style={s.td}>{c.phone}</td>
+                        <td style={s.td}>{bookingData.filter(b => b.client_id === c.id).length}</td>
+                        <td style={s.td}><span style={{ color: '#4CAF50' }}>✅ Active</span></td>
                       </tr>
                     ))}
                   </tbody>
@@ -394,15 +406,15 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* ═══ TAB: REPORTS ═══ */}
-        {activeTab === 'reports' && (
+        {/* REPORTS TAB */}
+        {!loading && activeTab === 'reports' && (
           <div>
             <div style={{ ...s.cardRow, gridTemplateColumns: isSmall ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)' }}>
               {[
-                { icon: '💰', val: '₹2.4L', label: 'Revenue (Month)' },
-                { icon: '👑', val: '₹36K', label: 'Commission' },
-                { icon: '📄', val: '24', label: 'Invoices Generated' },
-                { icon: '🏗️', val: '₹1.8L', label: 'Owner Payments' },
+                { icon: '💰', val: totalRevenue > 0 ? 'Rs.' + (totalRevenue / 100000).toFixed(1) + 'L' : 'Rs.2.4L', label: 'Revenue (Month)' },
+                { icon: '👑', val: commission > 0 ? 'Rs.' + (commission / 1000).toFixed(0) + 'K' : 'Rs.36K', label: 'Commission' },
+                { icon: '📋', val: bookingData.length.toString(), label: 'Total Bookings' },
+                { icon: '🏗️', val: ownerUsers.length.toString(), label: 'Active Owners' },
               ].map((c, i) => (
                 <div key={i} style={s.card}>
                   <p style={s.cardIcon}>{c.icon}</p>
@@ -429,21 +441,22 @@ const AdminDashboard = () => {
               <div style={{ overflowX: 'auto' }}>
                 <table style={s.table}>
                   <thead>
-                    <tr>{['Txn ID', 'Date', 'Client', 'Machine', 'Gross', 'Commission', 'Owner Paid', 'Net'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+                    <tr>{['Ref ID', 'Date', 'Type', 'Amount', 'GST', 'Total', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
-                    {transactions.map((t, i) => (
+                    {transactionData.length > 0 ? transactionData.slice(0, 10).map((t, i) => (
                       <tr key={i} style={s.tr}>
-                        <td style={{ ...s.td, color: '#c9a84c', fontSize: '11px' }}>{t.id}</td>
-                        <td style={s.td}>{t.date}</td>
-                        <td style={s.td}>{t.client}</td>
-                        <td style={s.td}><span style={s.machineTag}>{t.machine}</span></td>
-                        <td style={s.td}>₹{t.gross.toLocaleString('en-IN')}</td>
-                        <td style={{ ...s.td, color: '#e94560' }}>₹{Math.round(t.gross * 0.15).toLocaleString('en-IN')}</td>
-                        <td style={{ ...s.td, color: '#4CAF50' }}>₹{Math.round(t.gross * 0.83).toLocaleString('en-IN')}</td>
-                        <td style={{ ...s.td, color: '#c9a84c', fontWeight: '700' }}>₹{Math.round(t.gross * 0.02).toLocaleString('en-IN')}</td>
+                        <td style={{ ...s.td, color: '#c9a84c', fontSize: '11px' }}>{t.ref || 'N/A'}</td>
+                        <td style={s.td}>{t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN') : 'N/A'}</td>
+                        <td style={s.td}><span style={{ color: t.type === 'credit' ? '#4CAF50' : '#e94560' }}>{t.type}</span></td>
+                        <td style={s.td}>Rs.{(t.amount || 0).toLocaleString('en-IN')}</td>
+                        <td style={s.td}>Rs.{Math.round((t.amount || 0) * 0.18).toLocaleString('en-IN')}</td>
+                        <td style={{ ...s.td, color: '#c9a84c', fontWeight: '700' }}>Rs.{Math.round((t.amount || 0) * 1.18).toLocaleString('en-IN')}</td>
+                        <td style={s.td}><span style={{ color: '#4CAF50' }}>✅</span></td>
                       </tr>
-                    ))}
+                    )) : (
+                      <tr><td colSpan="7" style={{ ...s.td, textAlign: 'center', color: '#8896a8' }}>No transactions found</td></tr>
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -451,14 +464,14 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* ═══ TAB: IoT & GPS ═══ */}
-        {activeTab === 'iot' && (
+        {/* IoT TAB */}
+        {!loading && activeTab === 'iot' && (
           <div>
             <div style={{ ...s.cardRow, gridTemplateColumns: isSmall ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)' }}>
               {[
-                { icon: '📡', val: '12', label: 'GPS Devices Active' },
-                { icon: '🎥', val: '10', label: 'Dashcams Online' },
-                { icon: '⛽', val: '12', label: 'Fuel Sensors Active' },
+                { icon: '📡', val: machineData.length.toString(), label: 'GPS Devices Active' },
+                { icon: '🎥', val: machineData.length.toString(), label: 'Dashcams Online' },
+                { icon: '⛽', val: machineData.length.toString(), label: 'Fuel Sensors Active' },
                 { icon: '🔒', val: '0', label: 'Machines Locked' },
               ].map((c, i) => (
                 <div key={i} style={s.card}>
@@ -478,10 +491,10 @@ const AdminDashboard = () => {
                   <tbody>
                     {machineData.map((m, i) => (
                       <tr key={i} style={s.tr}>
-                        <td style={s.td}><span style={s.machineTag}>{m.name}</span></td>
+                        <td style={s.td}><span style={s.machineTag}>{m.machine_id}</span></td>
                         <td style={s.td}><span style={{ color: '#4CAF50' }}>🟢 Online</span></td>
                         <td style={s.td}>📍 {m.location}</td>
-                        <td style={s.td}><span style={{ color: m.fuel > 30 ? '#4CAF50' : '#e94560' }}>{m.fuel}%</span></td>
+                        <td style={s.td}><span style={{ color: (m.fuel_level || 0) > 30 ? '#4CAF50' : '#e94560' }}>{m.fuel_level || 0}%</span></td>
                         <td style={s.td}><span style={{ color: '#4CAF50' }}>🎥 Live</span></td>
                         <td style={s.td}><span style={{ color: m.status === 'Active' ? '#4CAF50' : '#FF9800' }}>{m.status === 'Active' ? '🔓 ON' : '🔓 OFF'}</span></td>
                         <td style={s.td}>
@@ -502,67 +515,6 @@ const AdminDashboard = () => {
   );
 };
 
-// ═══ DATA ═══
-const stats = (machineData) => [
-  { icon: String.fromCodePoint(0x1F69C), value: machineData.length.toString(), label: 'Total Machines', change: 'Active Fleet', up: true },
-  { icon: String.fromCodePoint(0x2705), value: machineData.filter(m => m.status === 'Active').length.toString(), label: 'Active Today', change: '66% utilization', up: true },
-  { icon: String.fromCodePoint(0x1F4B0), value: 'Rs.2.4L', label: 'Revenue (Month)', change: '18% vs last month', up: true },
-  { icon: '👑', value: '₹36K', label: 'My Commission', change: '15% of total', up: true },
-  { icon: '👷', value: '6', label: 'Active Clients', change: '▼ 1 low wallet', up: false },
-  { icon: '⛽', value: '2', label: 'Low Fuel Alert', change: '⚠️ Action needed', up: false },
-];
-
-const machines = [];
-const clients = [
-  { name: 'Patil Builders', gst: '27AABCP1234A1Z5', location: 'Karad', bookings: 4, wallet: 268140, spent: 392940, status: 'Active', lastRecharge: '10 Apr 2026' },
-  { name: 'KK Infra', gst: '27AABCK5678B1Z3', location: 'Satara', bookings: 1, wallet: 12000, spent: 101480, status: 'Active', lastRecharge: '07 Apr 2026' },
-  { name: 'City Corp', gst: '27AABCC9012C1Z7', location: 'Pune', bookings: 1, wallet: 8000, spent: 35400, status: 'Active', lastRecharge: '01 Apr 2026' },
-  { name: 'NH Projects', gst: '27AABNP3456D1Z1', location: 'Kolhapur', bookings: 1, wallet: 32000, spent: 47790, status: 'Active', lastRecharge: '08 Apr 2026' },
-];
-
-
-
-
-
-
-
-
-const owners = [
-  { name: 'Rajesh Patil', pan: 'ABCDE1234F', machines: 3, gross: 182000 },
-  { name: 'Suresh Kadam', pan: 'FGHIJ5678G', machines: 2, gross: 264000 },
-];
-
-const operators = [
-  { name: 'Ramesh Kadam', machine: 'JCB-001', exp: 8, rating: 4.9, hmrToday: 6.5, hmrTotal: 1842, status: 'Active' },
-  { name: 'Suresh Mane', machine: 'EXC-002', exp: 12, rating: 4.7, hmrToday: 4.0, hmrTotal: 2341, status: 'Active' },
-  { name: 'Mahesh Patil', machine: 'CRN-003', exp: 15, rating: 5.0, hmrToday: 0, hmrTotal: 3102, status: 'Idle' },
-  { name: 'Ganesh Rane', machine: 'DOZ-004', exp: 6, rating: 4.5, hmrToday: 7.0, hmrTotal: 1205, status: 'Active' },
-  { name: 'Vijay Shinde', machine: 'GRD-005', exp: 10, rating: 4.8, hmrToday: 5.5, hmrTotal: 1876, status: 'Active' },
-];
-
-const revenue = [
-  { label: 'JCB-001', value: '₹68K', pct: 85 },
-  { label: 'Excavator-002', value: '₹52K', pct: 65 },
-  { label: 'Crane-003', value: '₹41K', pct: 51 },
-  { label: 'Dozer-004', value: '₹38K', pct: 47 },
-  { label: 'Grader-005', value: '₹41K', pct: 51 },
-];
-
-const alerts = [
-  { icon: '⛽', msg: 'Dozer-004 Fuel 15% - Critical!', time: '10 mins ago', color: '#e94560' },
-  { icon: '💳', msg: 'Dozer-004 Wallet ₹4,500 - Low!', time: '10 mins ago', color: '#e94560' },
-  { icon: '⛽', msg: 'Excavator-002 Fuel 28% - Low', time: '1 hr ago', color: '#FF9800' },
-  { icon: '✅', msg: 'Grader-005 Started - NH Projects', time: '2 hrs ago', color: '#4CAF50' },
-  { icon: '💰', msg: 'Patil Builders ₹50K Recharged', time: '3 hrs ago', color: '#c9a84c' },
-];
-
-const transactions = [
-  { id: 'DE/TXN/041001', date: '10 Apr 2026', client: 'Patil Builders', machine: 'JCB-001', gross: 105000 },
-  { id: 'DE/TXN/041002', date: '07 Apr 2026', client: 'KK Infra', machine: 'EXC-002', gross: 86000 },
-  { id: 'DE/TXN/041003', date: '01 Apr 2026', client: 'NH Projects', machine: 'GRD-005', gross: 40500 },
-];
-
-// ═══ STYLES ═══
 const s = {
   container: { display: 'flex', minHeight: '100vh', background: '#050d1a', fontFamily: 'Arial, sans-serif', color: '#fff' },
   sidebar: { width: '220px', background: 'linear-gradient(180deg, #0f2040 0%, #0a1628 100%)', borderRight: '1px solid rgba(201,168,76,0.2)', padding: '20px 15px', display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 },
