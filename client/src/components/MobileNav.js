@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 
 const MobileNav = ({ navItems, activeTab, setActiveTab, topContent, bottomContent, title, subtitle }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -44,7 +44,7 @@ const MobileNav = ({ navItems, activeTab, setActiveTab, topContent, bottomConten
 
             {/* Nav Items */}
             <div style={{ padding: '8px' }}>
-              {navItems.map(item => (
+              {(navItems || []).map(item => (
                 <button key={item.id}
                   style={activeTab === item.id ? ms.navActive : ms.nav}
                   onClick={() => { setActiveTab(item.id); setMenuOpen(false); }}>
@@ -67,7 +67,7 @@ const MobileNav = ({ navItems, activeTab, setActiveTab, topContent, bottomConten
 
       {/* ═══ BOTTOM NAV BAR (Quick Access) ═══ */}
       <div style={ms.bottomBar}>
-        {navItems.slice(0, 5).map(item => (
+        {(navItems || []).slice(0, 5).map(item => (
           <button key={item.id}
             style={{ ...ms.bottomItem, color: activeTab === item.id ? '#c9a84c' : '#8896a8' }}
             onClick={() => setActiveTab(item.id)}>
