@@ -137,7 +137,7 @@ const AdminDashboard = () => {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
             {!isSmall && <LanguageSelector compact={true} />}
-            <LanguageSelector compact={true} />
+            
             {!isSmall && (
               <div style={s.adminBadge}>
                 <span style={s.adminDot}></span>
