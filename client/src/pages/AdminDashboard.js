@@ -139,6 +139,7 @@ const AdminDashboard = () => {
             <p style={s.pageDate}>📅 {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} · Karad, Satara</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+            {!isSmall && <LanguageSelector compact={true} />}
             <LanguageSelector compact={true} />
             {!isSmall && (
               <div style={s.adminBadge}>
