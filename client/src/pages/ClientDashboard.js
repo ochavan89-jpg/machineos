@@ -28,12 +28,12 @@ const TRANSACTIONS = [
 ];
 
 const NAV = [
-  { id: 'book', icon: '🚜', label: 'bookMachine' },
-  { id: 'calculator', icon: '💰', label: 'costCalculator' },
-  { id: 'mybookings', icon: '📋', label: 'myBookings' },
-  { id: 'tracking', icon: '📍', label: 'liveTracking' },
-  { id: 'wallet', icon: '💳', label: 'wallet' },
-  { id: 'reports', icon: '📊', label: 'reports' },
+  { id: 'book', icon: String.fromCodePoint(0x1F69C), label: 'Book Machine' },
+  { id: 'calculator', icon: String.fromCodePoint(0x1F4B0), label: 'Cost & Booking' },
+  { id: 'mybookings', icon: String.fromCodePoint(0x1F4CB), label: 'My Bookings' },
+  { id: 'tracking', icon: String.fromCodePoint(0x1F4CD), label: 'Live Tracking' },
+  { id: 'wallet', icon: String.fromCodePoint(0x1F4B3), label: 'Wallet & Pay' },
+  { id: 'reports', icon: String.fromCodePoint(0x1F4CA), label: 'Reports' },
 ];
 
 const NAV_LABELS = {

@@ -39,13 +39,13 @@ const ALERTS = [
 ];
 
 const NAV = [
-  { id: 'dashboard', icon: '📊', label: 'Dashboard' },
-  { id: 'machines', icon: '🚜', label: 'My Machines' },
-  { id: 'register', icon: '📝', label: 'Register Machine' },
-  { id: 'tracking', icon: '📍', label: 'GPS Tracking' },
-  { id: 'reports', icon: '💰', label: 'Reports & Pay' },
-  { id: 'alerts', icon: '🔔', label: 'Alerts' },
-  { id: 'support', icon: '🆘', label: 'Support' },
+  { id: 'dashboard', icon: String.fromCodePoint(0x1F4CA), label: 'Dashboard' },
+  { id: 'machines', icon: String.fromCodePoint(0x1F69C), label: 'My Machines' },
+  { id: 'register', icon: String.fromCodePoint(0x1F4DD), label: 'Register Machine' },
+  { id: 'tracking', icon: String.fromCodePoint(0x1F4CD), label: 'GPS Tracking' },
+  { id: 'reports', icon: String.fromCodePoint(0x1F4B0), label: 'Reports & Pay' },
+  { id: 'alerts', icon: String.fromCodePoint(0x1F514), label: 'Alerts' },
+  { id: 'support', icon: String.fromCodePoint(0x1F198), label: 'Support' },
 ];
 
 const OwnerDashboard = () => {

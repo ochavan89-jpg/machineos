@@ -51,15 +51,15 @@ const AdminDashboard = () => {
   const lowFuelMachines = machineData.filter(m => (m.fuel_level || 0) < 30);
 
   const NAV = [
-    { id: 'overview', icon: '📊', label: 'Overview' },
-    { id: 'machines', icon: '🚜', label: 'Machines' },
-    { id: 'clients', icon: '👷', label: 'Clients' },
-    { id: 'owners', icon: '🏗️', label: 'Owners' },
-    { id: 'operators', icon: '🔧', label: 'Operators' },
-    { id: 'wallet', icon: '💳', label: 'Wallet & Billing' },
-    { id: 'reports', icon: '📈', label: 'Reports' },
-    { id: 'iot', icon: '📡', label: 'IoT & GPS' },
-  ];
+  { id: 'overview', icon: String.fromCodePoint(0x1F4CA), label: 'Overview' },
+  { id: 'machines', icon: String.fromCodePoint(0x1F69C), label: 'Machines' },
+  { id: 'clients', icon: String.fromCodePoint(0x1F477), label: 'Clients' },
+  { id: 'owners', icon: String.fromCodePoint(0x1F3D7), label: 'Owners' },
+  { id: 'operators', icon: String.fromCodePoint(0x1F527), label: 'Operators' },
+  { id: 'wallet', icon: String.fromCodePoint(0x1F4B3), label: 'Wallet & Billing' },
+  { id: 'reports', icon: String.fromCodePoint(0x1F4C8), label: 'Reports' },
+  { id: 'iot', icon: String.fromCodePoint(0x1F4E1), label: 'IoT & GPS' },
+];
 
   const isSmall = isMobile || isTablet;
 
