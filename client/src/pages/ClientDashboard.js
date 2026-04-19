@@ -255,7 +255,7 @@ const ClientDashboard = () => {
             <p style={s.pageDate}>{new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <LanguageSelector compact={true} />
+            
             {!isSmall && (
               <div style={s.clientBadge}>
                 <span style={s.onlineDot}></span>
