@@ -1,4 +1,5 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
+import LanguageSelector from './LanguageSelector';
 
 const MobileNav = ({ navItems, activeTab, setActiveTab, topContent, bottomContent, title, subtitle }) => {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -15,6 +16,7 @@ const MobileNav = ({ navItems, activeTab, setActiveTab, topContent, bottomConten
             <p style={ms.topSub}>{subtitle || 'Portal'}</p>
           </div>
         </div>
+        <LanguageSelector compact={true} />
         <button style={ms.hamburger} onClick={() => setMenuOpen(!menuOpen)}>
           {menuOpen ? '✕' : '☰'}
         </button>
