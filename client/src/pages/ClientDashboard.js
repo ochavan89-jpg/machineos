@@ -246,8 +246,7 @@ const ClientDashboard = () => {
       <div style={{ ...s.main, padding: isSmall ? '70px 12px 70px' : '25px' }}>
         <div style={{ ...s.header, flexDirection: isSmall ? 'column' : 'row', gap: isSmall ? '8px' : '0' }}>
           <div>
-            <p style={{ color: '#c9a84c', fontSize: '11px', margin: '0 0 2px', cursor: 'pointer' }}
-              onClick={() => { const tabs = ['book', 'calculator', 'mybookings', 'tracking', 'wallet', 'reports']; const i = tabs.indexOf(activeTab); if (i > 0) setActiveTab(tabs[i - 1]); }}>Back</p>
+            <button style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.25)', color:'#c9a84c', borderRadius:'8px', padding:'6px 12px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px' }} onClick={() => { const tabs=['book','calculator','mybookings','tracking','wallet','reports']; const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>← Back</button>
             <h2 style={{ ...s.pageTitle, fontSize: isSmall ? '16px' : '20px' }}>
               {mobileNavItems.find(n => n.id === activeTab)?.icon}{' '}
               {mobileNavItems.find(n => n.id === activeTab)?.label}
