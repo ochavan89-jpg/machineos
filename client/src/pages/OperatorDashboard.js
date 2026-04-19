@@ -22,12 +22,12 @@ const OPERATOR = {
 };
 
 const NAV = [
-  { id: 'home', icon: '🏠', label: 'Home' },
-  { id: 'attendance', icon: '✅', label: 'Attendance' },
-  { id: 'machinelog', icon: '🚜', label: 'Machine Log' },
-  { id: 'fuel', icon: '⛽', label: 'Fuel Report' },
-  { id: 'daily', icon: '📋', label: 'Daily Report' },
-  { id: 'issues', icon: '⚠️', label: 'Report Issue' },
+  { id: 'home', icon: '\u{1F3E0}', label: 'Home' },
+  { id: 'attendance', icon: '\u2705', label: 'Attendance' },
+  { id: 'machinelog', icon: '\u{1F69C}', label: 'Machine Log' },
+  { id: 'fuel', icon: '\u26FD', label: 'Fuel Report' },
+  { id: 'daily', icon: '\u{1F4CB}', label: 'Daily Report' },
+  { id: 'issues', icon: '\u26A0\uFE0F', label: 'Report Issue' },
 ];
 
 const attendanceHistory = [
