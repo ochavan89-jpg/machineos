@@ -144,7 +144,7 @@ const OwnerDashboard = () => {
         {/* Header */}
         <div style={{ ...s.header, flexDirection: isSmall ? 'column' : 'row', gap: isSmall ? '8px' : '0' }}>
           <div>
-            <button style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.25)', color:'#c9a84c', borderRadius:'8px', padding:'6px 12px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px' }} onClick={() => { const tabs=NAV.map(n=>n.id); const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>← Back</button>
+            <button style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.25)', color:'#c9a84c', borderRadius:'8px', padding:'6px 12px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px', position:'fixed', top:'66px', left:'12px', zIndex:50 }} onClick={() => { const tabs=NAV.map(n=>n.id); const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>← Back</button>
             <h2 style={{ ...s.pageTitle, fontSize: isSmall ? '16px' : '20px' }}>
               {NAV.find(n => n.id === activeTab)?.icon}{' '}{NAV.find(n => n.id === activeTab)?.label}
             </h2>
