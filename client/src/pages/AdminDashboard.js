@@ -128,7 +128,7 @@ const AdminDashboard = () => {
       <div style={{ ...s.main, padding: isSmall ? '70px 12px 70px' : '25px' }}>
         <div style={{ ...s.header, flexDirection: isSmall ? 'column' : 'row', gap: isSmall ? '10px' : '0', alignItems: isSmall ? 'flex-start' : 'center' }}>
           <div>
-            <p style={{ color: '#c9a84c', fontSize: '11px', margin: '0 0 2px', cursor: 'pointer' }}
+            <button style={{ background: "rgba(201,168,76,0.1)", border: "1px solid rgba(201,168,76,0.25)", color: "#c9a84c", borderRadius: "8px", padding: "6px 12px", fontSize: "12px", cursor: "pointer", fontWeight: "600" }}
               onClick={() => { const tabs = ['overview', 'machines', 'clients', 'owners', 'operators', 'wallet', 'reports', 'iot']; const i = tabs.indexOf(activeTab); if (i > 0) setActiveTab(tabs[i - 1]); }}>
               ← Back
             </p>
