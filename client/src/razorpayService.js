@@ -22,7 +22,7 @@ export const initiatePayment = async ({ amount, name, email, phone, description,
     handler: function (response) {
       onSuccess(response);
     },
-    prefill: { name, email, contact: phone },
+    prefill: { name: name || '', email: email || '', contact: '' },
     theme: { color: '#c9a84c' },
     modal: { ondismiss: () => { if (onFailure) onFailure(); } }
   };
