@@ -159,6 +159,9 @@ const ClientDashboard = () => {
     setActiveTab('mybookings');
   };
 
+  const CLIENT = JSON.parse(localStorage.getItem('machineos_user') || '{}');
+const clientName = CLIENT.name || 'Client';
+
  const handleRecharge = async () => {
   const amt = parseInt(rechargeAmt);
   if (!amt || amt < 5000) { alert('Minimum Rs.5,000 recharge करा!'); return; }
