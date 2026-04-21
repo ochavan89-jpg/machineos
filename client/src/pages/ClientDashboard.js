@@ -1,3 +1,4 @@
+import { initiatePayment } from '../razorpayService';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
@@ -158,13 +159,37 @@ const ClientDashboard = () => {
     setActiveTab('mybookings');
   };
 
-  const handleRecharge = () => {
-    const amt = parseInt(rechargeAmt);
-    if (!amt || amt < 5000) { alert('Minimum Recharge Rs.5,000 aahe'); return; }
-    setWalletBalance(prev => prev + amt);
-    setRechargeAmt('');
-    setShowRecharge(false);
-  };
+ const handleRecharge = async () => {
+  const amt = parseInt(rechargeAmt);
+  if (!amt || amt < 5000) { alert('Minimum Rs.5,000 recharge करा!'); return; }
+  
+  await initiatePayment({
+    amount: amt,
+    name: clientName,
+    email: CLIENT.email || 'machineos@developmentexpress.in',
+    phone: CLIENT.phone || '+919766926636',
+    description: 'MachineOS Wallet Recharge',
+    onSuccess: async (response) => {
+      const newBalance = walletBalance + amt;
+      if (CLIENT?.id) {
+        await updateWalletBalance(CLIENT.id, newBalance);
+        await addTransaction({
+          user_id: CLIENT.id,
+          type: 'credit',
+          amount: amt,
+          description: 'Wallet Recharge - Razorpay',
+          reference: response.razorpay_payment_id
+        });
+      }
+      setWalletBalance(newBalance);
+      setShowRecharge(false);
+      alert(String.fromCodePoint(0x2705) + ' Rs.' + amt.toLocaleString('en-IN') + ' Wallet मध्ये add झाले!');
+    },
+    onFailure: () => {
+      alert(String.fromCodePoint(0x274C) + ' Payment failed! पुन्हा try करा.');
+    }
+  });
+};
 
   const handleCancelRequest = (booking) => { setCancelBooking(booking); setShowCancelModal(true); };
 
