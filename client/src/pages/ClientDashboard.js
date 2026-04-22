@@ -182,6 +182,11 @@ const clientName = CLIENT.name || 'Client';
           amount: amt,
           description: 'Wallet Recharge - Razorpay',
           reference: response.razorpay_payment_id
+          });
+        }
+        setWalletBalance(newBalance);
+        setShowRecharge(false);
+        alert('Payment Successful! Rs.' + amt + ' wallet मध्ये add झाले!');
         });
       }
       setWalletBalance(newBalance);
