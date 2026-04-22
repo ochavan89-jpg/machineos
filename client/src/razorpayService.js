@@ -13,7 +13,7 @@ export const initiatePayment = async ({ amount, name, email, phone, description,
   if (!loaded) { alert('Razorpay load failed!'); return; }
 
   try {
-    const orderRes = await fetch('https://xoqolkqsdkfwxveuwlow.supabase.co/functions/v1/create_order-', {
+    const orderRes = await fetch('https://xoqolkqsdkfwxveuwlow.supabase.co/functions/v1/create_order', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ amount })
