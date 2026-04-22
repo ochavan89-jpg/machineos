@@ -18,7 +18,7 @@ export const initiatePayment = async ({ amount, name, email, phone, description,
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.REACT_APP_SUPABASE_ANON_KEY },
       body: JSON.stringify({ amount })
     });
-    const order = await orderRes.json();
+    const order = await orderRes.json(); console.log('Order response:', JSON.stringify(order));
 
     const options = {
       key: process.env.REACT_APP_RAZORPAY_KEY_ID,
