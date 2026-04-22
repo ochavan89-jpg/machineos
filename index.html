@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Development Express — The Gold Standard of Infrastructure</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gold: #c9a84c;
+    --gold-light: #e2c97e;
+    --gold-dark: #a07830;
+    --dark: #050d1a;
+    --dark-2: #0a1628;
+    --dark-3: #0f2040;
+    --white: #ffffff;
+    --gray: #f8f9fa;
+    --text-dark: #1a1a2e;
+    --text-mid: #4a5568;
+    --text-light: #8896a8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    color: var(--text-dark);
+    overflow-x: hidden;
+  }
+
+  /* ─── NAVBAR ─── */
+  nav {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 60px;
+    background: rgba(255,255,255,0.95);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(201,168,76,0.15);
+    box-shadow: 0 2px 40px rgba(0,0,0,0.06);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+  }
+
+  .logo-circle {
+    width: 42px; height: 42px;
+    background: linear-gradient(135deg, var(--gold-dark), var(--gold-light));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Playfair Display', serif;
+    font-weight: 900;
+    color: var(--dark);
+    font-size: 15px;
+  }
+
+  .logo-text { line-height: 1.1; }
+  .logo-name { color: var(--gold-dark); font-weight: 700; font-size: 15px; letter-spacing: 0.5px; }
+  .logo-sub { color: var(--text-light); font-size: 10px; letter-spacing: 2px; }
+
+  .nav-links {
+    display: flex;
+    align-items: center;
+    gap: 36px;
+    list-style: none;
+  }
+
+  .nav-links a {
+    text-decoration: none;
+    color: var(--text-mid);
+    font-size: 14px;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover { color: var(--gold-dark); }
+
+  .nav-cta {
+    background: linear-gradient(135deg, var(--gold-dark), var(--gold-light));
+    color: var(--dark) !important;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+  }
+
+  /* ─── HERO ─── */
+  .hero {
+    min-height: 100vh;
+    background: var(--dark);
+    position: relative;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    padding-top: 80px;
+  }
+
+  .hero-bg {
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 80% 60% at 70% 40%, rgba(201,168,76,0.12) 0%, transparent 70%),
+      radial-gradient(ellipse 40% 40% at 20% 80%, rgba(10,22,40,0.9) 0%, transparent 70%);
+  }
+
+  .hero-grid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(201,168,76,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(201,168,76,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  .hero-content {
+    position: relative;
+    z-index: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 60px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(201,168,76,0.12);
+    border: 1px solid rgba(201,168,76,0.3);
+    border-radius: 100px;
+    padding: 6px 16px;
+    margin-bottom: 24px;
+  }
+
+  .hero-badge-dot {
+    width: 6px; height: 6px;
+    background: var(--gold);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .hero-badge span {
+    color: var(--gold);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+  }
+
+  .hero h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 60px;
+    font-weight: 900;
+    color: var(--white);
+    line-height: 1.1;
+    margin-bottom: 24px;
+  }
+
+  .hero h1 span {
+    background: linear-gradient(135deg, var(--gold-dark), var(--gold-light));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero-desc {
+    color: rgba(255,255,255,0.6);
+    font-size: 18px;
+    line-height: 1.7;
+    margin-bottom: 40px;
+  }
+
+  .hero-btns {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--gold-dark), var(--gold-light));
+    color: var(--dark);
+    padding: 16px 36px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 15px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 8px 30px rgba(201,168,76,0.3);
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 40px rgba(201,168,76,0.4);
+  }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--white);
+    padding: 16px 36px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    text-decoration: none;
+    border: 1px solid rgba(255,255,255,0.2);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+  }
+
+  .btn-secondary:hover {
+    background: rgba(255,255,255,0.05);
+    border-color: rgba(255,255,255,0.4);
+  }
+
+  .hero-stats {
+    display: flex;
+    gap: 40px;
+    margin-top: 56px;
+    padding-top: 40px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .hero-stat-num {
+    font-family: 'Playfair Display', serif;
+    font-size: 32px;
+    font-weight: 900;
+    color: var(--gold);
+  }
+
+  .hero-stat-label {
+    color: rgba(255,255,255,0.4);
+    font-size: 12px;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  .hero-visual {
+    position: relative;
+  }
+
+  .hero-card {
+    background: rgba(15,32,64,0.8);
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 20px;
+    padding: 28px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 40px 80px rgba(0,0,0,0.4);
+  }
+
+  .hero-card-title {
+    color: var(--gold);
+    font-size: 13px;
+    letter-spacing: 1px;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .live-dot {
+    width: 8px; height: 8px;
+    background: #4CAF50;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  .machine-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .machine-row:last-child { border-bottom: none; }
+
+  .machine-icon {
+    width: 36px; height: 36px;
+    background: rgba(201,168,76,0.1);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+  }
+
+  .machine-info { flex: 1; }
+  .machine-name { color: var(--white); font-size: 12px; font-weight: 600; }
+  .machine-loc { color: var(--text-light); font-size: 10px; }
+
+  .machine-status {
+    padding: 4px 10px;
+    border-radius: 100px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .status-active { background: rgba(76,175,80,0.15); color: #4CAF50; border: 1px solid #4CAF50; }
+  .status-deployed { background: rgba(201,168,76,0.15); color: var(--gold); border: 1px solid var(--gold); }
+
+  .fuel-bar-wrap { margin-top: 20px; }
+  .fuel-bar-label { display: flex; justify-content: space-between; color: var(--text-light); font-size: 11px; margin-bottom: 6px; }
+  .fuel-bar-bg { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; }
+  .fuel-bar-fill { height: 100%; background: linear-gradient(90deg, var(--gold-dark), var(--gold-light)); border-radius: 2px; }
+
+  /* ─── TRUST STRIP ─── */
+  .trust-strip {
+    background: var(--gray);
+    padding: 30px 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 60px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid #e8e8e8;
+  }
+
+  .trust-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-mid);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .trust-icon { font-size: 20px; }
+
+  /* ─── SECTION BASE ─── */
+  section { padding: 100px 60px; max-width: 1200px; margin: 0 auto; }
+
+  .section-label {
+    color: var(--gold-dark);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-family: 'Playfair Display', serif;
+    font-size: 44px;
+    font-weight: 900;
+    color: var(--text-dark);
+    line-height: 1.2;
+    margin-bottom: 16px;
+  }
+
+  .section-title span { color: var(--gold-dark); }
+
+  .section-desc {
+    color: var(--text-mid);
+    font-size: 18px;
+    line-height: 1.7;
+    max-width: 600px;
+  }
+
+  /* ─── SERVICES ─── */
+  .services-wrap { background: var(--white); }
+
+  .services-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 60px;
+  }
+
+  .service-card {
+    border: 1px solid #e8e8e8;
+    border-radius: 16px;
+    padding: 32px;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .service-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--gold-dark), var(--gold-light));
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .service-card:hover {
+    border-color: rgba(201,168,76,0.3);
+    box-shadow: 0 20px 60px rgba(201,168,76,0.1);
+    transform: translateY(-4px);
+  }
+
+  .service-card:hover::before { opacity: 1; }
+
+  .service-icon {
+    width: 56px; height: 56px;
+    background: linear-gradient(135deg, rgba(201,168,76,0.1), rgba(201,168,76,0.05));
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 26px;
+    margin-bottom: 20px;
+    border: 1px solid rgba(201,168,76,0.2);
+  }
+
+  .service-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 10px;
+  }
+
+  .service-desc { color: var(--text-mid); font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
+
+  .service-rate {
+    color: var(--gold-dark);
+    font-weight: 700;
+    font-size: 15px;
+  }
+
+  /* ─── HOW IT WORKS ─── */
+  .how-wrap {
+    background: var(--dark);
+    padding: 100px 0;
+  }
+
+  .how-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 60px;
+  }
+
+  .how-inner .section-title { color: var(--white); }
+  .how-inner .section-desc { color: rgba(255,255,255,0.5); }
+
+  .steps-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 24px;
+    margin-top: 60px;
+    position: relative;
+  }
+
+  .steps-grid::before {
+    content: '';
+    position: absolute;
+    top: 40px;
+    left: 10%;
+    right: 10%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(201,168,76,0.3), transparent);
+  }
+
+  .step-card {
+    background: rgba(15,32,64,0.6);
+    border: 1px solid rgba(201,168,76,0.15);
+    border-radius: 16px;
+    padding: 28px;
+    text-align: center;
+    position: relative;
+  }
+
+  .step-num {
+    width: 56px; height: 56px;
+    background: linear-gradient(135deg, var(--gold-dark), var(--gold-light));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Playfair Display', serif;
+    font-size: 20px;
+    font-weight: 900;
+    color: var(--dark);
+    margin: 0 auto 20px;
+  }
+
+  .step-title { color: var(--gold); font-size: 16px; font-weight: 700; margin-bottom: 10px; }
+  .step-desc { color: rgba(255,255,255,0.5); font-size: 13px; line-height: 1.6; }
+
+  /* ─── FLEET ─── */
+  .fleet-wrap { background: var(--gray); padding: 100px 0; }
+  .fleet-inner { max-width: 1200px; margin: 0 auto; padding: 0 60px; }
+
+  .fleet-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+    margin-top: 60px;
+  }
+
+  .fleet-card {
+    background: var(--white);
+    border-radius: 16px;
+    overflow: hidden;
+    border: 1px solid #e8e8e8;
+    transition: all 0.3s;
+  }
+
+  .fleet-card:hover {
+    box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+    transform: translateY(-4px);
+  }
+
+  .fleet-card-header {
+    background: var(--dark-3);
+    padding: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .fleet-machine-icon { font-size: 36px; }
+
+  .fleet-machine-id {
+    background: rgba(201,168,76,0.15);
+    border: 1px solid rgba(201,168,76,0.3);
+    color: var(--gold);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .fleet-card-body { padding: 24px; }
+
+  .fleet-machine-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin-bottom: 6px;
+  }
+
+  .fleet-machine-type { color: var(--text-light); font-size: 12px; margin-bottom: 16px; }
+
+  .fleet-rates {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .fleet-rate-item {
+    background: var(--gray);
+    border-radius: 8px;
+    padding: 10px;
+    text-align: center;
+  }
+
+  .fleet-rate-val { color: var(--gold-dark); font-weight: 700; font-size: 14px; }
+  .fleet-rate-label { color: var(--text-light); font-size: 10px; }
+
+  .fleet-fuel {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .fleet-fuel-bar {
+    flex: 1;
+    height: 4px;
+    background: #e8e8e8;
+    border-radius: 2px;
+  }
+
+  .fleet-fuel-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--gold-dark), var(--gold-light));
+  }
+
+  .fleet-fuel-label { color: var(--text-light); font-size: 11px; }
+
+  /* ─── TECH ─── */
+  .tech-wrap { background: var(--white); padding: 100px 0; }
+  .tech-inner { max-width: 1200px; margin: 0 auto; padding: 0 60px; }
+
+  .tech-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+    margin-top: 60px;
+  }
+
+  .tech-features { display: flex; flex-direction: column; gap: 24px; }
+
+  .tech-feature {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  .tech-feature-icon {
+    width: 44px; height: 44px;
+    background: linear-gradient(135deg, rgba(201,168,76,0.1), rgba(201,168,76,0.05));
+    border: 1px solid rgba(201,168,76,0.2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+  }
+
+  .tech-feature-title { font-weight: 700; color: var(--text-dark); margin-bottom: 4px; }
+  .tech-feature-desc { color: var(--text-mid); font-size: 14px; line-height: 1.6; }
+
+  .tech-visual {
+    background: var(--dark);
+    border-radius: 20px;
+    padding: 28px;
+    border: 1px solid rgba(201,168,76,0.2);
+    box-shadow: 0 40px 80px rgba(0,0,0,0.2);
+  }
+
+  .tech-visual-title { color: var(--gold); font-size: 13px; letter-spacing: 1px; margin-bottom: 20px; }
+
+  .tech-stat-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .tech-stat-row:last-child { border-bottom: none; }
+  .tech-stat-label { color: rgba(255,255,255,0.5); font-size: 13px; }
+  .tech-stat-val { color: var(--white); font-weight: 700; font-size: 13px; }
+  .tech-stat-badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+
+  /* ─── CTA ─── */
+  .cta-wrap {
+    background: linear-gradient(135deg, var(--dark) 0%, var(--dark-3) 100%);
+    padding: 100px 60px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cta-wrap::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 600px; height: 600px;
+    background: radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%);
+  }
+
+  .cta-wrap h2 {
+    font-family: 'Playfair Display', serif;
+    font-size: 48px;
+    font-weight: 900;
+    color: var(--white);
+    margin-bottom: 20px;
+    position: relative;
+  }
+
+  .cta-wrap h2 span { color: var(--gold); }
+  .cta-wrap p { color: rgba(255,255,255,0.5); font-size: 18px; margin-bottom: 40px; position: relative; }
+
+  .cta-btns {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    flex-wrap: wrap;
+    position: relative;
+  }
+
+  .btn-whatsapp {
+    background: #25D366;
+    color: var(--white);
+    padding: 16px 36px;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 15px;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s;
+    box-shadow: 0 8px 30px rgba(37,211,102,0.3);
+  }
+
+  .btn-whatsapp:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(37,211,102,0.4); }
+
+  /* ─── FOOTER ─── */
+  footer {
+    background: var(--dark);
+    border-top: 1px solid rgba(201,168,76,0.15);
+    padding: 60px;
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1fr;
+    gap: 40px;
+  }
+
+  .footer-brand p { color: rgba(255,255,255,0.4); font-size: 13px; line-height: 1.7; margin-top: 16px; max-width: 280px; }
+
+  .footer-col h4 { color: var(--gold); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 16px; }
+
+  .footer-col a {
+    display: block;
+    color: rgba(255,255,255,0.5);
+    text-decoration: none;
+    font-size: 13px;
+    margin-bottom: 10px;
+    transition: color 0.2s;
+  }
+
+  .footer-col a:hover { color: var(--white); }
+
+  .footer-bottom {
+    background: var(--dark);
+    border-top: 1px solid rgba(255,255,255,0.05);
+    padding: 20px 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .footer-bottom p { color: rgba(255,255,255,0.3); font-size: 12px; }
+
+  .gstin { color: rgba(201,168,76,0.5); font-size: 11px; }
+
+  /* ─── MOBILE ─── */
+  @media (max-width: 768px) {
+    nav { padding: 16px 20px; }
+    .nav-links { display: none; }
+
+    .hero-content { grid-template-columns: 1fr; padding: 0 20px; gap: 40px; }
+    .hero h1 { font-size: 36px; }
+    .hero-visual { display: none; }
+    .hero-stats { gap: 24px; }
+
+    section { padding: 60px 20px; }
+    .section-title { font-size: 32px; }
+
+    .services-grid { grid-template-columns: 1fr; }
+    .steps-grid { grid-template-columns: repeat(2, 1fr); }
+    .steps-grid::before { display: none; }
+    .fleet-grid { grid-template-columns: 1fr; }
+    .tech-grid { grid-template-columns: 1fr; }
+
+    .trust-strip { padding: 20px; gap: 20px; }
+    .cta-wrap { padding: 60px 20px; }
+    .cta-wrap h2 { font-size: 32px; }
+
+    footer { grid-template-columns: 1fr; padding: 40px 20px; }
+    .footer-bottom { flex-direction: column; gap: 8px; padding: 20px; text-align: center; }
+  }
+
+  /* ─── ANIMATIONS ─── */
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .hero-badge { animation: fadeInUp 0.6s ease forwards; }
+  .hero h1 { animation: fadeInUp 0.6s ease 0.1s both; }
+  .hero-desc { animation: fadeInUp 0.6s ease 0.2s both; }
+  .hero-btns { animation: fadeInUp 0.6s ease 0.3s both; }
+  .hero-stats { animation: fadeInUp 0.6s ease 0.4s both; }
+  .hero-visual { animation: fadeInUp 0.6s ease 0.5s both; }
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav>
+  <a href="#" class="logo">
+    <div class="logo-circle">DE</div>
+    <div class="logo-text">
+      <div class="logo-name">DEVELOPMENT EXPRESS</div>
+      <div class="logo-sub">THE GOLD STANDARD</div>
+    </div>
+  </a>
+  <ul class="nav-links">
+    <li><a href="#services">Services</a></li>
+    <li><a href="#fleet">Fleet</a></li>
+    <li><a href="#technology">Technology</a></li>
+    <li><a href="#contact">Contact</a></li>
+    <li><a href="https://machineos.developmentexpress.in" class="nav-cta">Login to MachineOS →</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero" id="home">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-content">
+    <div>
+      <div class="hero-badge">
+        <div class="hero-badge-dot"></div>
+        <span>LIVE OPERATIONS · KARAD, SATARA</span>
+      </div>
+      <h1>Maharashtra's <span>Smartest</span> Machinery Rental Platform</h1>
+      <p class="hero-desc">Real-time GPS tracking, digital wallet payments, and automated operations for construction machinery. Trusted by contractors across Maharashtra since 2011.</p>
+      <div class="hero-btns">
+        <a href="https://machineos.developmentexpress.in" class="btn-primary">🚜 Book a Machine →</a>
+        <a href="https://wa.me/919766926636" class="btn-secondary">💬 WhatsApp Us</a>
+      </div>
+      <div class="hero-stats">
+        <div>
+          <div class="hero-stat-num">15+</div>
+          <div class="hero-stat-label">YEARS EXPERIENCE</div>
+        </div>
+        <div>
+          <div class="hero-stat-num">5</div>
+          <div class="hero-stat-label">MACHINES LIVE</div>
+        </div>
+        <div>
+          <div class="hero-stat-num">100%</div>
+          <div class="hero-stat-label">DIGITAL PAYMENTS</div>
+        </div>
+      </div>
+    </div>
+    <div class="hero-visual">
+      <div class="hero-card">
+        <div class="hero-card-title">
+          <div class="live-dot"></div>
+          🚜 LIVE MACHINE STATUS
+        </div>
+        <div class="machine-row">
+          <div class="machine-icon">🏗️</div>
+          <div class="machine-info">
+            <div class="machine-name">JCB 3DX Backhoe</div>
+            <div class="machine-loc">📍 Karad, Satara</div>
+          </div>
+          <div class="machine-status status-active">Active</div>
+        </div>
+        <div class="machine-row">
+          <div class="machine-icon">⛏️</div>
+          <div class="machine-info">
+            <div class="machine-name">Hyundai R215 Excavator</div>
+            <div class="machine-loc">📍 Satara</div>
+          </div>
+          <div class="machine-status status-active">Active</div>
+        </div>
+        <div class="machine-row">
+          <div class="machine-icon">🏗️</div>
+          <div class="machine-info">
+            <div class="machine-name">Tadano 50T Crane</div>
+            <div class="machine-loc">📍 Karad, Satara</div>
+          </div>
+          <div class="machine-status status-deployed">Deployed</div>
+        </div>
+        <div class="fuel-bar-wrap">
+          <div class="fuel-bar-label"><span>⛽ Fleet Fuel Average</span><span style="color:#c9a84c">68%</span></div>
+          <div class="fuel-bar-bg"><div class="fuel-bar-fill" style="width:68%"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TRUST STRIP -->
+<div class="trust-strip">
+  <div class="trust-item"><span class="trust-icon">✅</span> GST Compliant — GSTIN: 27ABCDE1234F1Z5</div>
+  <div class="trust-item"><span class="trust-icon">🔒</span> 100% Digital Wallet Payments</div>
+  <div class="trust-item"><span class="trust-icon">📡</span> Real-time GPS Tracking</div>
+  <div class="trust-item"><span class="trust-icon">⚡</span> Same Day Machine Dispatch</div>
+  <div class="trust-item"><span class="trust-icon">📞</span> 24/7 Support Available</div>
+</div>
+
+<!-- SERVICES -->
+<div class="services-wrap" id="services">
+  <section>
+    <div class="section-label">OUR SERVICES</div>
+    <h2 class="section-title">Construction Machinery <span>On Demand</span></h2>
+    <p class="section-desc">Hourly, daily, weekly, or monthly — we have the right machine for every project at competitive rates.</p>
+    <div class="services-grid">
+      <div class="service-card">
+        <div class="service-icon">🏗️</div>
+        <div class="service-name">Backhoe Loader</div>
+        <p class="service-desc">JCB 3DX — Perfect for excavation, loading, and grading work at construction sites.</p>
+        <div class="service-rate">From Rs.1,400/hr · Rs.10,500/day</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">⛏️</div>
+        <div class="service-name">Hydraulic Excavator</div>
+        <p class="service-desc">Hyundai R215 — Heavy duty excavation for large infrastructure projects.</p>
+        <div class="service-rate">From Rs.2,200/hr · Rs.16,500/day</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🏗️</div>
+        <div class="service-name">Mobile Crane</div>
+        <p class="service-desc">Tadano 50T — Heavy lifting for bridges, high-rise, and industrial projects.</p>
+        <div class="service-rate">From Rs.3,500/hr · Rs.26,000/day</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🚜</div>
+        <div class="service-name">Bulldozer</div>
+        <p class="service-desc">Komatsu D65 — Land clearing, grading, and heavy earthwork operations.</p>
+        <div class="service-rate">From Rs.1,800/hr · Rs.13,500/day</div>
+      </div>
+      <div class="service-card">
+        <div class="service-icon">🛣️</div>
+        <div class="service-name">Motor Grader</div>
+        <p class="service-desc">Bharat Benz 120G — Road grading, leveling, and surface finishing work.</p>
+        <div class="service-rate">From Rs.2,000/hr · Rs.15,000/day</div>
+      </div>
+      <div class="service-card" style="background:linear-gradient(135deg,#050d1a,#0f2040);border-color:rgba(201,168,76,0.3);">
+        <div class="service-icon" style="background:rgba(201,168,76,0.15);">⭐</div>
+        <div class="service-name" style="color:#c9a84c;">Custom Requirements?</div>
+        <p class="service-desc" style="color:rgba(255,255,255,0.5);">Need something specific? Contact us for customized machinery solutions for your project.</p>
+        <a href="https://wa.me/919766926636" style="color:#c9a84c;font-weight:700;font-size:14px;text-decoration:none;">WhatsApp Us →</a>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- HOW IT WORKS -->
+<div class="how-wrap" id="how">
+  <div class="how-inner">
+    <div class="section-label" style="color:rgba(201,168,76,0.7)">HOW IT WORKS</div>
+    <h2 class="section-title">Book in 4 Simple Steps</h2>
+    <p class="section-desc">From booking to machine on site — fully digital, fully transparent.</p>
+    <div class="steps-grid">
+      <div class="step-card">
+        <div class="step-num">1</div>
+        <div class="step-title">Register & Wallet</div>
+        <p class="step-desc">Create your client account and add funds to your digital wallet. No cash accepted.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">2</div>
+        <div class="step-title">Choose Machine</div>
+        <p class="step-desc">Browse available machines, check real-time fuel levels and location, select your type.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">3</div>
+        <div class="step-title">Confirm & Pay</div>
+        <p class="step-desc">Pay advance from wallet. Get instant WhatsApp + Email confirmation.</p>
+      </div>
+      <div class="step-card">
+        <div class="step-num">4</div>
+        <div class="step-title">Track Live</div>
+        <p class="step-desc">Monitor machine GPS location, fuel level, and HMR hours in real-time from your dashboard.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FLEET -->
+<div class="fleet-wrap" id="fleet">
+  <div class="fleet-inner">
+    <div class="section-label">OUR FLEET</div>
+    <h2 class="section-title">5 Machines, <span>Always Ready</span></h2>
+    <p class="section-desc">All machines equipped with GPS tracking, fuel sensors, and operator included in rate.</p>
+    <div class="fleet-grid">
+      <div class="fleet-card">
+        <div class="fleet-card-header">
+          <span class="fleet-machine-icon">🏗️</span>
+          <span class="fleet-machine-id">JCB-001</span>
+        </div>
+        <div class="fleet-card-body">
+          <div class="fleet-machine-name">JCB 3DX Backhoe Loader</div>
+          <div class="fleet-machine-type">Backhoe Loader · MH-09-AB-1234 · 2022</div>
+          <div class="fleet-rates">
+            <div class="fleet-rate-item"><div class="fleet-rate-val">₹1,400</div><div class="fleet-rate-label">Per Hour</div></div>
+            <div class="fleet-rate-item"><div class="fleet-rate-val">₹10,500</div><div class="fleet-rate-label">Per Day</div></div>
+          </div>
+          <div class="fleet-fuel">
+            <span class="fleet-fuel-label">⛽ 72%</span>
+            <div class="fleet-fuel-bar"><div class="fleet-fuel-fill" style="width:72%"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="fleet-card">
+        <div class="fleet-card-header">
+          <span class="fleet-machine-icon">⛏️</span>
+          <span class="fleet-machine-id">EXC-002</span>
+        </div>
+        <div class="fleet-card-body">
+          <div class="fleet-machine-name">Hyundai R215 Excavator</div>
+          <div class="fleet-machine-type">Hydraulic Excavator · MH-09-CD-5678 · 2021</div>
+          <div class="fleet-rates">
+            <div class="fleet-rate-item"><div class="fleet-rate-val">₹2,200</div><div class="fleet-rate-label">Per Hour</div></div>
+            <div class="fleet-rate-item"><div class="fleet-rate-val">₹16,500</div><div class="fleet-rate-label">Per Day</div></div>
+          </div>
+          <div class="fleet-fuel">
+            <span class="fleet-fuel-label">⛽ 55%</span>
+            <div class="fleet-fuel-bar"><div class="fleet-fuel-fill" style="width:55%"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="fleet-card">
+        <div class="fleet-card-header">
+          <span class="fleet-machine-icon">🏗️</span>
+          <span class="fleet-machine-id">CRN-003</span>
+        </div>
+        <div class="fleet-card-body">
+          <div class="fleet-machine-name">Tadano 50T Mobile Crane</div>
+          <div class="fleet-machine-type">Mobile Crane · MH-09-EF-9012 · 2023</div>
+          <div class="fleet-rates">
+            <div class="fleet-rate-item"><div class="fleet-rate-val">₹3,500</div><div class="fleet-rate-label">Per Hour</div></div>
+            <div class="fleet-rate-item"><div class="fleet-rate-val">₹26,000</div><div class="fleet-rate-label">Per Day</div></div>
+          </div>
+          <div class="fleet-fuel">
+            <span class="fleet-fuel-label">⛽ 81%</span>
+            <div class="fleet-fuel-bar"><div class="fleet-fuel-fill" style="width:81%"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="fleet-card">
+        <div class="fleet-card-header">
+          <span class="fleet-machine-icon">🚜</span>
+          <span class="fleet-machine-id">DOZ-004</span>
+        </div>
+        <div class="fleet-card-body">
+          <div class="fleet-machine-name">Komatsu D65 Dozer</div>
+          <div class="fleet-machine-type">Bulldozer · MH-09-GH-3456 · 2020</div>
+          <div class="fleet-rates">
+            <div class="fleet-rate-item"><div class="fleet-rate-val">₹1,800</div><div class="fleet-rate-label">Per Hour</div></div>
+            <div class="fleet-rate-item"><div class="fleet-rate-val">₹13,500</div><div class="fleet-rate-label">Per Day</div></div>
+          </div>
+          <div class="fleet-fuel">
+            <span class="fleet-fuel-label">⛽ 38%</span>
+            <div class="fleet-fuel-bar"><div class="fleet-fuel-fill" style="width:38%;background:linear-gradient(90deg,#e94560,#FF5722)"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="fleet-card">
+        <div class="fleet-card-header">
+          <span class="fleet-machine-icon">🛣️</span>
+          <span class="fleet-machine-id">GRD-005</span>
+        </div>
+        <div class="fleet-card-body">
+          <div class="fleet-machine-name">Bharat Benz Grader 120G</div>
+          <div class="fleet-machine-type">Motor Grader · MH-09-IJ-7890 · 2022</div>
+          <div class="fleet-rates">
+            <div class="fleet-rate-item"><div class="fleet-rate-val">₹2,000</div><div class="fleet-rate-label">Per Hour</div></div>
+            <div class="fleet-rate-item"><div class="fleet-rate-val">₹15,000</div><div class="fleet-rate-label">Per Day</div></div>
+          </div>
+          <div class="fleet-fuel">
+            <span class="fleet-fuel-label">⛽ 63%</span>
+            <div class="fleet-fuel-bar"><div class="fleet-fuel-fill" style="width:63%"></div></div>
+          </div>
+        </div>
+      </div>
+      <div class="fleet-card" style="background:linear-gradient(135deg,#050d1a,#0f2040);border-color:rgba(201,168,76,0.3);display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:40px 24px;">
+        <div style="font-size:48px;margin-bottom:16px;">🚜</div>
+        <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;color:#c9a84c;margin-bottom:12px;">More Coming Soon</div>
+        <p style="color:rgba(255,255,255,0.4);font-size:14px;margin-bottom:24px;">Expanding fleet — register your machine with Development Express</p>
+        <a href="https://machineos.developmentexpress.in" class="btn-primary" style="font-size:13px;padding:12px 24px;">Register Machine →</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- TECHNOLOGY -->
+<div class="tech-wrap" id="technology">
+  <div class="tech-inner">
+    <div class="section-label">TECHNOLOGY</div>
+    <h2 class="section-title">Powered by <span>MachineOS</span></h2>
+    <p class="section-desc">India's first construction machinery management platform — built from ground up for real operations.</p>
+    <div class="tech-grid">
+      <div class="tech-features">
+        <div class="tech-feature">
+          <div class="tech-feature-icon">📡</div>
+          <div>
+            <div class="tech-feature-title">Real-time GPS Tracking</div>
+            <p class="tech-feature-desc">Teltonika FMB920 GPS devices on every machine — live location, ignition status, and route history.</p>
+          </div>
+        </div>
+        <div class="tech-feature">
+          <div class="tech-feature-icon">⛽</div>
+          <div>
+            <div class="tech-feature-title">Fuel Sensor Monitoring</div>
+            <p class="tech-feature-desc">Omnicomm LLS fuel sensors with 99.2% accuracy — real-time fuel level monitoring and theft alerts.</p>
+          </div>
+        </div>
+        <div class="tech-feature">
+          <div class="tech-feature-icon">💳</div>
+          <div>
+            <div class="tech-feature-title">Digital Wallet System</div>
+            <p class="tech-feature-desc">100% cashless operations — UPI, NEFT, IMPS, card payments. Instant wallet top-up and settlement.</p>
+          </div>
+        </div>
+        <div class="tech-feature">
+          <div class="tech-feature-icon">💬</div>
+          <div>
+            <div class="tech-feature-title">WhatsApp Automation</div>
+            <p class="tech-feature-desc">Instant WhatsApp alerts for booking confirmation, fuel alerts, issue reports, and payment receipts.</p>
+          </div>
+        </div>
+        <div class="tech-feature">
+          <div class="tech-feature-icon">📄</div>
+          <div>
+            <div class="tech-feature-title">GST Compliant Invoicing</div>
+            <p class="tech-feature-desc">Auto-generated GST invoices, payment receipts, and ledger reports for full compliance.</p>
+          </div>
+        </div>
+      </div>
+      <div class="tech-visual">
+        <div class="tech-visual-title">⚡ SYSTEM STATUS</div>
+        <div class="tech-stat-row">
+          <span class="tech-stat-label">Platform Uptime</span>
+          <span class="tech-stat-badge" style="background:rgba(76,175,80,0.15);color:#4CAF50;border:1px solid #4CAF50">99.9% ✅</span>
+        </div>
+        <div class="tech-stat-row">
+          <span class="tech-stat-label">GPS Devices Online</span>
+          <span class="tech-stat-val">5 / 5 🟢</span>
+        </div>
+        <div class="tech-stat-row">
+          <span class="tech-stat-label">Active Bookings</span>
+          <span class="tech-stat-val" style="color:#c9a84c">Live</span>
+        </div>
+        <div class="tech-stat-row">
+          <span class="tech-stat-label">Payment Mode</span>
+          <span class="tech-stat-badge" style="background:rgba(201,168,76,0.15);color:#c9a84c;border:1px solid rgba(201,168,76,0.3)">Wallet Only</span>
+        </div>
+        <div class="tech-stat-row">
+          <span class="tech-stat-label">Data Security</span>
+          <span class="tech-stat-badge" style="background:rgba(76,175,80,0.15);color:#4CAF50;border:1px solid #4CAF50">256-bit SSL ✅</span>
+        </div>
+        <div class="tech-stat-row">
+          <span class="tech-stat-label">WhatsApp Alerts</span>
+          <span class="tech-stat-badge" style="background:rgba(37,211,102,0.15);color:#25D366;border:1px solid #25D366">Active ✅</span>
+        </div>
+        <div style="margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.05);text-align:center;">
+          <a href="https://machineos.developmentexpress.in" class="btn-primary" style="font-size:13px;padding:12px 24px;display:inline-flex;">Open MachineOS →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CTA -->
+<div class="cta-wrap" id="contact">
+  <h2>Ready to <span>Book a Machine?</span></h2>
+  <p>Contact us on WhatsApp or login to MachineOS to book instantly.</p>
+  <div class="cta-btns">
+    <a href="https://wa.me/919766926636" class="btn-whatsapp">💬 WhatsApp: +91-9766926636</a>
+    <a href="https://machineos.developmentexpress.in" class="btn-primary">🚜 Open MachineOS →</a>
+  </div>
+  <div style="margin-top:40px;display:flex;justify-content:center;gap:40px;flex-wrap:wrap;">
+    <div style="text-align:center;">
+      <div style="color:rgba(255,255,255,0.4);font-size:12px;letter-spacing:1px;margin-bottom:4px">EMAIL</div>
+      <a href="mailto:machineos@developmentexpress.in" style="color:#c9a84c;text-decoration:none;font-size:14px">machineos@developmentexpress.in</a>
+    </div>
+    <div style="text-align:center;">
+      <div style="color:rgba(255,255,255,0.4);font-size:12px;letter-spacing:1px;margin-bottom:4px">PHONE</div>
+      <a href="tel:+919766926636" style="color:#c9a84c;text-decoration:none;font-size:14px">+91-9766926636</a>
+    </div>
+    <div style="text-align:center;">
+      <div style="color:rgba(255,255,255,0.4);font-size:12px;letter-spacing:1px;margin-bottom:4px">LOCATION</div>
+      <span style="color:#c9a84c;font-size:14px">Karad, Satara — Maharashtra</span>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-brand">
+    <div class="logo">
+      <div class="logo-circle">DE</div>
+      <div class="logo-text">
+        <div class="logo-name">DEVELOPMENT EXPRESS</div>
+        <div class="logo-sub" style="color:rgba(201,168,76,0.4)">THE GOLD STANDARD</div>
+      </div>
+    </div>
+    <p>Maharashtra's most advanced construction machinery rental platform. Powered by MachineOS — built for real operations.</p>
+    <p style="margin-top:12px" class="gstin">GSTIN: 27ABCDE1234F1Z5 · Since 2011</p>
+  </div>
+  <div class="footer-col">
+    <h4>Platform</h4>
+    <a href="https://machineos.developmentexpress.in">MachineOS Login</a>
+    <a href="#fleet">Our Fleet</a>
+    <a href="#services">Services</a>
+    <a href="#technology">Technology</a>
+  </div>
+  <div class="footer-col">
+    <h4>Company</h4>
+    <a href="#home">About Us</a>
+    <a href="#contact">Contact</a>
+    <a href="https://machineos.developmentexpress.in">Owner Portal</a>
+    <a href="https://machineos.developmentexpress.in">Operator Portal</a>
+  </div>
+  <div class="footer-col">
+    <h4>Contact</h4>
+    <a href="https://wa.me/919766926636">💬 WhatsApp</a>
+    <a href="tel:+919766926636">📞 +91-9766926636</a>
+    <a href="mailto:machineos@developmentexpress.in">📧 Email Us</a>
+    <a href="#">📍 Karad, Satara</a>
+  </div>
+</footer>
+<div class="footer-bottom">
+  <p>© 2026 Development Express. All Rights Reserved.</p>
+  <p class="gstin">Om Chavan (B.Tech Civil) — Managing Director</p>
+</div>
+
+</body>
+</html>
