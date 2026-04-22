@@ -92,6 +92,15 @@ const ClientDashboard = () => {
       }
     };
     loadData();
+
+    const walletInterval = setInterval(async () => {
+      const user = JSON.parse(localStorage.getItem('machineos_user') || '{}');
+      if (user?.id) {
+        const bal = await getWalletBalance(user.id);
+        if (bal !== null) setWalletBalance(bal);
+      }
+    }, 30000);
+    return () => clearInterval(walletInterval);
   }, []); // eslint-disable-line
 
   const displayMachines = machineList.length > 0 ? machineList : MACHINES;
