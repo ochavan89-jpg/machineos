@@ -164,7 +164,7 @@ const clientName = CLIENT.name || 'Client';
 
  const handleRecharge = async () => {
   const amt = parseInt(rechargeAmt);
-  if (!amt || amt < 5000) { alert('Minimum Rs.5,000 recharge करा!'); return; }
+  if (!amt || amt < 1) { alert('Minimum Rs.1 recharge करा!'); return; }
   
   await initiatePayment({
     amount: amt,
