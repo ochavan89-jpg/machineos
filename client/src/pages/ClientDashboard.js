@@ -1,13 +1,5 @@
 import { initiatePayment } from '../razorpayService';
-// Wallet real-time polling every 30 seconds
-const walletInterval = setInterval(async () => {
-  if (CLIENT?.id) {
-    const bal = await getWalletBalance(CLIENT.id);
-    if (bal !== null) setWalletBalance(bal);
-  }
-}, 30000);
-return () => clearInterval(walletInterval);
-import React, { useState, useEffect } from 'react';
+import React, { useState,  } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageSelector from '../components/LanguageSelector';
