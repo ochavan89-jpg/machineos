@@ -47,6 +47,8 @@ const NAV_LABELS = {
 };
 
 const ClientDashboard = () => {
+  const CLIENT = JSON.parse(localStorage.getItem('machineos_user') || '{}');
+  const clientName = CLIENT.name || 'Client';
   const navigate = useNavigate();
   const { t } = useLanguage(); // eslint-disable-line
   const { isMobile, isTablet } = useWindowSize();
