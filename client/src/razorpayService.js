@@ -15,7 +15,7 @@ export const initiatePayment = async ({ amount, name, email, phone, description,
   try {
     const orderRes = await fetch('https://xoqolkqsdkfwxveuwlow.supabase.co/functions/v1/create_order', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + process.env.REACT_APP_SUPABASE_ANON_KEY },
       body: JSON.stringify({ amount })
     });
     const order = await orderRes.json();
