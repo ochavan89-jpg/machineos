@@ -186,7 +186,17 @@ const clientName = CLIENT.name || 'Client';
       }
       setWalletBalance(newBalance);
       setShowRecharge(false);
-      alert(String.fromCodePoint(0x2705) + ' Rs.' + amt.toLocaleString('en-IN') + ' Wallet मध्ये add झाले!');
+      // WhatsApp alert to admin
+fetch('https://xoqolkqsdkfwxveuwlow.supabase.co/functions/v1/send_whatsapp', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    to: '+918408000084',
+    message: 'MachineOS Payment Received!\nClient: ' + (CLIENT.name || 'Client') + '\nAmount: Rs.' + amt.toLocaleString('en-IN') + '\nPayment ID: ' + response.razorpay_payment_id + '\nNew Balance: Rs.' + newBalance.toLocaleString('en-IN')
+  })
+}).catch(e => console.log('WhatsApp error:', e));
+
+alert(String.fromCodePoint(0x2705) + ' Payment Successful!\nRs.' + amt.toLocaleString('en-IN') + ' wallet मध्ये add झाले!\nPayment ID: ' + response.razorpay_payment_id);
     },
     onFailure: () => {
       alert(String.fromCodePoint(0x274C) + ' Payment failed! पुन्हा try करा.');
