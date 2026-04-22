@@ -12,24 +12,36 @@ export const initiatePayment = async ({ amount, name, email, phone, description,
   const loaded = await loadRazorpay();
   if (!loaded) { alert('Razorpay load failed!'); return; }
 
-  const options = {
-    key: process.env.REACT_APP_RAZORPAY_KEY_ID,
-    amount: amount * 100,
-    currency: 'INR',
-    name: 'Development Express',
-    description: description || 'MachineOS Wallet Recharge',
-    image: '',
-    handler: function (response) {
-      onSuccess(response);
-    },
-    prefill: { name: name || '', email: email || '', contact: '' },
-    theme: { color: '#c9a84c' },
-    modal: { ondismiss: () => { if (onFailure) onFailure(); } }
-  };
+  try {
+    const orderRes = await fetch('https://xoqolkqsdkfwxveuwlow.supabase.co/functions/v1/create_order', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount })
+    });
+    const order = await orderRes.json();
 
-  const rzp = new window.Razorpay(options);
-  rzp.on('payment.failed', function (response) {
-    if (onFailure) onFailure(response.error);
-  });
-  rzp.open();
+    const options = {
+      key: process.env.REACT_APP_RAZORPAY_KEY_ID,
+      amount: order.amount,
+      currency: 'INR',
+      order_id: order.id,
+      name: 'Development Express',
+      description: description || 'MachineOS Wallet Recharge',
+      handler: function (response) { onSuccess(response); },
+      prefill: {
+        name: name || 'Customer',
+        email: email || 'customer@machineos.in',
+        contact: phone || '8408000084'
+      },
+      theme: { color: '#c9a84c' },
+      modal: { ondismiss: () => { if (onFailure) onFailure(); } }
+    };
+
+    const rzp = new window.Razorpay(options);
+    rzp.on('payment.failed', (response) => { if (onFailure) onFailure(response.error); });
+    rzp.open();
+  } catch (err) {
+    alert('Payment init failed: ' + err.message);
+    if (onFailure) onFailure();
+  }
 };
