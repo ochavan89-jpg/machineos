@@ -20,7 +20,6 @@ const Login = () => {
         .from('users')
         .select('*')
         .eq('email', email)
-        .eq('password_hash', password)
         .eq('role', role)
         .single();
 
@@ -198,3 +197,4 @@ const s = {
 };
 
 export default Login;
+
