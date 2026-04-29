@@ -173,6 +173,43 @@ const Login = () => {
 
         <p style={s.bottomText}>2026 Development Express - All Rights Reserved - GSTIN: 27ABCDE1234F1Z5</p>
       </div>
+
+      {showSignup && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999, padding: '20px', overflowY: 'auto' }}>
+          <div style={{ background: 'linear-gradient(135deg, #0f2040, #0a1628)', border: '1px solid rgba(201,168,76,0.4)', borderRadius: '20px', padding: '28px', width: '100%', maxWidth: '420px' }}>
+            {signupSuccess ? (
+              <div style={{ textAlign: 'center' }}>
+                <p style={{ fontSize: '48px', margin: '0 0 12px' }}>{String.fromCodePoint(0x2705)}</p>
+                <h3 style={{ color: '#4CAF50', marginBottom: '8px' }}>Registration Successful!</h3>
+                <p style={{ color: '#8896a8', fontSize: '13px', marginBottom: '20px' }}>Admin will activate your account within 24 hours.</p>
+                <button style={{ background: 'linear-gradient(135deg, #a07830, #e2c97e)', color: '#0a1628', border: 'none', padding: '11px 28px', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }} onClick={() => { setShowSignup(false); setSignupSuccess(false); setSignup({ name: '', company: '', email: '', phone: '', gstin: '', password: '' }); }}>Back to Login</button>
+              </div>
+            ) : (
+              <div>
+                <h3 style={{ color: '#c9a84c', textAlign: 'center', margin: '0 0 20px' }}>New Client Registration</h3>
+                {[
+                  { key: 'name', label: 'Contact Name *', placeholder: 'Your name', type: 'text' },
+                  { key: 'company', label: 'Company Name *', placeholder: 'Patil Builders Pvt. Ltd.', type: 'text' },
+                  { key: 'email', label: 'Email *', placeholder: 'billing@company.com', type: 'email' },
+                  { key: 'phone', label: 'Phone *', placeholder: '+91-9876543210', type: 'text' },
+                  { key: 'gstin', label: 'GSTIN (optional)', placeholder: '27AABCP1234A1Z5', type: 'text' },
+                  { key: 'password', label: 'Password *', placeholder: 'Create password', type: 'password' },
+                ].map(field => (
+                  <div key={field.key} style={{ marginBottom: '12px' }}>
+                    <label style={{ color: '#8896a8', fontSize: '11px', display: 'block', marginBottom: '4px' }}>{field.label}</label>
+                    <input type={field.type} style={{ width: '100%', padding: '10px 12px', background: 'rgba(5,13,26,0.8)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box', outline: 'none' }} placeholder={field.placeholder} value={signup[field.key]} onChange={e => setSignup(prev => ({ ...prev, [field.key]: e.target.value }))} />
+                  </div>
+                ))}
+                {signupError && <p style={{ color: '#e94560', fontSize: '12px', marginBottom: '10px' }}>{signupError}</p>}
+                <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+                  <button style={{ flex: 1, padding: '11px', background: 'transparent', border: '1px solid rgba(255,255,255,0.15)', color: '#8896a8', borderRadius: '8px', cursor: 'pointer' }} onClick={() => { setShowSignup(false); setSignupError(''); }}>Cancel</button>
+                  <button style={{ flex: 1, padding: '11px', background: 'linear-gradient(135deg, #a07830, #e2c97e)', color: '#0a1628', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', opacity: loading ? 0.7 : 1 }} onClick={handleSignup} disabled={loading}>{loading ? 'Registering...' : 'Register'}</button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
