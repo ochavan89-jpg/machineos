@@ -202,7 +202,7 @@ const OperatorDashboard = () => {
                 {/* Logout */}
                 <div style={{ padding: '12px 16px' }}>
                   <button style={s.drawerLogout} onClick={() => navigate('/')}>
-                    ?? Logout
+                    🚪 Logout
                   </button>
                 </div>
               </div>
@@ -258,7 +258,7 @@ const OperatorDashboard = () => {
             </div>
             <p style={{ ...s.msLabel, color: fuelColor }}>{String.fromCodePoint(0x26FD)} Fuel: {fuelLevel}%</p>
           </div>
-          <button style={s.logoutBtn} onClick={() => navigate('/')}>?? Logout</button>
+          <button style={s.logoutBtn} onClick={() => navigate('/')}>🚪 Logout</button>
           <p style={s.sidebarFooter}>Since 2011 � 15 Yrs Excellence</p>
         </div>
       )}
@@ -575,8 +575,8 @@ const OperatorDashboard = () => {
         {activeTab === 'issues' && (
           <div>
             <div style={{ ...s.card, border: '1px solid rgba(233,69,96,0.3)' }}>
-              <h3 style={{ ...s.cardTitle, color: '#e94560' }}>{String.fromCodePoint(0x26A0)} Issue Report ???</h3>
-              <p style={{ color: '#8896a8', fontSize: '12px', marginBottom: '14px' }}>??????? ???? ?????? ??????? Report ???.</p>
+              <h3 style={{ ...s.cardTitle, color: '#e94560' }}>{String.fromCodePoint(0x26A0)} Issue Report ⚠</h3>
+              <p style={{ color: '#8896a8', fontSize: '12px', marginBottom: '14px' }}>Any machine issue report kara immediately.</p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
                 {[
                   { id: 'mechanical', icon: String.fromCodePoint(0x1F527), label: 'Mechanical' },
@@ -597,7 +597,7 @@ const OperatorDashboard = () => {
                 placeholder="?????? ??????? ?????..." value={issueNote} onChange={e => setIssueNote(e.target.value)} />
               <button style={{ ...s.dangerBtn, opacity: (!issueType || !issueNote) ? 0.5 : 1 }}
                 disabled={!issueType || !issueNote} onClick={handleReportIssue}>
-                {String.fromCodePoint(0x1F6A8)} Issue Report Submit ???
+                {String.fromCodePoint(0x1F6A8)} 🚨 Issue Report Submit
               </button>
             </div>
             <div style={s.card}>
