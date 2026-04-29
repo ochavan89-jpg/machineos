@@ -58,6 +58,7 @@ const ClientDashboard = () => {
   const [selectedMachine, setSelectedMachine] = useState(null);
   const [bookingType, setBookingType] = useState('hourly');
   const [quantity, setQuantity] = useState(3);
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [walletBalance, setWalletBalance] = useState(268140);
   const [rechargeAmt, setRechargeAmt] = useState('');
   const [showRecharge, setShowRecharge] = useState(false);
