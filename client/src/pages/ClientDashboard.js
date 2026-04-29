@@ -6,6 +6,7 @@ import { useLanguage } from '../context/LanguageContext';
 // import LanguageSelector from '../components/LanguageSelector';
 import { generateGSTInvoice, generateBookingReport } from '../services/pdfGenerator';
 import MobileNav from '../components/MobileNav';
+import BookingCalendar from '../components/BookingCalendar';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { sendBookingConfirmation } from '../emailService';
 import { sendBookingWhatsApp } from '../whatsappService';
