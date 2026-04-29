@@ -39,7 +39,7 @@ function pct(n, p) { return Math.round(n * p / 100); }
 
 // ─── HEADER ───
 function drawHeader(doc, title, sub) {
-  const W = doc.internal.pageSize.getWidth();
+  // const W = doc.internal.pageSize.getWidth();
   doc.setFillColor(...C.navy);
   doc.rect(0, 0, W, 55, 'F');
   doc.setFillColor(...C.gold);
@@ -93,7 +93,7 @@ function drawHeader(doc, title, sub) {
 
 // ─── META BAR ───
 function drawMeta(doc, items) {
-  const W = doc.internal.pageSize.getWidth();
+  // const W = doc.internal.pageSize.getWidth();
   doc.setFillColor(...C.navy);
   doc.rect(0, 56, W, 16, 'F');
   items.forEach(([label, val, x]) => {
@@ -136,7 +136,7 @@ function drawInfoBox(doc, x, y, w, h, title, rows) {
 
 // ─── TOTALS BLOCK ───
 function drawTotals(doc, y, rows, finalLabel, finalVal) {
-  const W = doc.internal.pageSize.getWidth();
+  // const W = doc.internal.pageSize.getWidth();
   const tx = 125, tw = W - tx - 10;
   rows.forEach(([label, val, bg, vc]) => {
     doc.setFillColor(...bg);
@@ -166,7 +166,7 @@ function drawTotals(doc, y, rows, finalLabel, finalVal) {
 
 // ─── FOOTER ───
 function drawFooter(doc, label) {
-  const W = doc.internal.pageSize.getWidth();
+  // const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   doc.setFillColor(...C.navy);
   doc.rect(0, H - 14, W, 14, 'F');
@@ -194,7 +194,7 @@ function drawWatermark(doc, text) {}
 // ══════════════════════════════════════════════
 export function generateGSTInvoice(booking) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const W = doc.internal.pageSize.getWidth();
+  // const W = doc.internal.pageSize.getWidth();
 
   drawHeader(doc, 'TAX INVOICE', '(Original for Recipient)');
   drawMeta(doc, [
@@ -330,7 +330,7 @@ export function generateGSTInvoice(booking) {
 // ══════════════════════════════════════════════
 export function generateOwnerReceipt(booking) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const W = doc.internal.pageSize.getWidth();
+  // const W = doc.internal.pageSize.getWidth();
 
   drawHeader(doc, 'MACHINE OWNER PAYMENT RECEIPT', '(Settlement Statement)');
   drawMeta(doc, [
@@ -476,7 +476,7 @@ export function generateOwnerReceipt(booking) {
 // ══════════════════════════════════════════════
 export function generateInternalLedger(booking) {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-  const W = doc.internal.pageSize.getWidth();
+  // const W = doc.internal.pageSize.getWidth();
 
   drawHeader(doc, 'INTERNAL TRANSACTION LEDGER', '(Confidential — Development Express Use Only)');
   drawMeta(doc, [
@@ -626,7 +626,7 @@ export function generateInternalLedger(booking) {
 // ══════════════════════════════════════════════
 export function generateBookingReport(bookings, clientName) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-  const W = doc.internal.pageSize.getWidth();
+  // const W = doc.internal.pageSize.getWidth();
 
   drawHeader(doc, 'BOOKING HISTORY REPORT', `Client: ${clientName}`);
 
@@ -672,6 +672,7 @@ export function generateBookingReport(bookings, clientName) {
   drawFooter(doc, 'Booking History Report');
   doc.save(`DE_Booking_Report_${(clientName || 'Client').replace(/\s/g, '_')}.pdf`);
 }
+
 
 
 

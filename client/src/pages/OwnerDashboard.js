@@ -65,14 +65,14 @@ const OwnerDashboard = () => {
 
 
   const [machineData, setMachineData] = useState([]);
-  const [bookingData, setBookingData] = useState([]);
+  // const [bookingData, setBookingData] = useState([]);
 
   useEffect(() => {
     const loadData = async () => {
       const machines = await getMachines();
       setMachineData(machines);
       const bookings = await getAllBookings();
-      setBookingData(bookings);
+      // setBookingData(bookings);
     };
     loadData();
   }, []);
@@ -634,5 +634,6 @@ const s = {
 };
 
 export default OwnerDashboard;
+
 
 
