@@ -5,7 +5,6 @@ import LanguageSelector from '../components/LanguageSelector';
 import { generateInternalLedger } from '../services/pdfGenerator';
 import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
-import BackButton from '../components/BackButton';
 import { getMachines, getAllBookings, getAllUsers, getAllTransactions, getAllIssues } from '../supabaseService';
 
 const NAV = [

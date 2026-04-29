@@ -6,7 +6,6 @@ import { useLanguage } from '../context/LanguageContext';
 import { generateGSTInvoice, generateBookingReport } from '../services/pdfGenerator';
 import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
-import BackButton from '../components/BackButton';
 import { sendBookingConfirmation } from '../emailService';
 import { sendBookingWhatsApp } from '../whatsappService';
 import { getMachines, createBooking, getWalletBalance, updateWalletBalance, addTransaction } from '../supabaseService';
