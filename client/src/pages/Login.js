@@ -10,6 +10,10 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
+  const [signup, setSignup] = useState({ name: '', company: '', email: '', phone: '', gstin: '', password: '' });
+  const [signupError, setSignupError] = useState('');
+  const [signupSuccess, setSignupSuccess] = useState(false);
 
   const handleLogin = async () => {
     if (!email || !password) { setError('Email aani Password taka'); return; }
@@ -34,6 +38,20 @@ const Login = () => {
     } catch (err) {
       setError('Login failed — please try again');
     }
+    setLoading(false);
+  };
+
+  const handleSignup = async () => {
+    const { name, company, email, phone, gstin, password } = signup;
+    if (!name || !company || !email || !phone || !password) { setSignupError('सगळे fields भरा!'); return; }
+    setLoading(true);
+    try {
+      const { error } = await supabase.from('users').insert([{ name: company, email, phone, role: 'client', password_hash: password, gstin: gstin || null }]);
+      if (error) { setSignupError('Registration failed: ' + error.message); setLoading(false); return; }
+      // WhatsApp alert to admin
+      fetch('https://xoqolkqsdkfwxveuwlow.supabase.co/functions/v1/send_whatsapp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: '+918408000084', message: 'New Client Registration!\nName: ' + name + '\nCompany: ' + company + '\nEmail: ' + email + '\nPhone: ' + phone }) }).catch(() => {});
+      setSignupSuccess(true);
+    } catch (err) { setSignupError('Error: ' + err.message); }
     setLoading(false);
   };
 
@@ -126,6 +144,9 @@ const Login = () => {
             {loading ? 'Logging in...' : 'Login to MachineOS'}
           </button>
 
+          <div style={{ textAlign: 'center', marginBottom: '12px' }}>
+            <button style={{ background: 'transparent', border: 'none', color: '#c9a84c', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline' }} onClick={() => setShowSignup(true)}>New Client? Register Here</button>
+          </div>
           <div style={s.demoBox}>
             <p style={s.demoTitle}>Demo Credentials:</p>
             <div style={s.demoGrid}>
