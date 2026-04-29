@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import useSessionTimeout from '../hooks/useSessionTimeout';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageSelector from '../components/LanguageSelector';
 import { sendIssueAlert } from '../emailService';
@@ -58,6 +59,7 @@ const pastIssues = [
 
 const OperatorDashboard = () => {
   const navigate = useNavigate();
+  useSessionTimeout();
   const { t } = useLanguage(); // eslint-disable-line
   const { isMobile, isTablet } = useWindowSize();
   const isSmall = isMobile || isTablet;

@@ -1,6 +1,7 @@
 import { initiatePayment } from '../razorpayService';
 import React, { useState, useEffect,  } from 'react';
 import { useNavigate } from 'react-router-dom';
+import useSessionTimeout from '../hooks/useSessionTimeout';
 import { useLanguage } from '../context/LanguageContext';
 // import LanguageSelector from '../components/LanguageSelector';
 import { generateGSTInvoice, generateBookingReport } from '../services/pdfGenerator';
@@ -48,6 +49,7 @@ const NAV_LABELS = {
 
 const ClientDashboard = () => {
   const navigate = useNavigate();
+  useSessionTimeout();
   const { t } = useLanguage(); // eslint-disable-line
   const { isMobile, isTablet } = useWindowSize();
   const isSmall = isMobile || isTablet;
