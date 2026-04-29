@@ -6,6 +6,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { generateGSTInvoice, generateBookingReport } from '../services/pdfGenerator';
 import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
+import BackButton from '../components/BackButton';
 import { sendBookingConfirmation } from '../emailService';
 import { sendBookingWhatsApp } from '../whatsappService';
 import { getMachines, createBooking, getWalletBalance, updateWalletBalance, addTransaction } from '../supabaseService';
@@ -293,7 +294,7 @@ alert(String.fromCodePoint(0x2705) + ' Payment Successful!\nRs.' + amt.toLocaleS
       <div style={{ ...s.main, padding: isSmall ? '70px 12px 70px' : '25px' }}>
         <div style={{ ...s.header, flexDirection: isSmall ? 'column' : 'row', gap: isSmall ? '8px' : '0' }}>
           <div>
-            <button style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.25)', color:'#c9a84c', borderRadius:'8px', padding:'6px 12px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px' }} onClick={() => { const tabs=['book','calculator','mybookings','tracking','wallet','reports']; const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>← Back</button>
+            <button style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.25)', color:'#c9a84c', borderRadius:'8px', padding:'4px 10px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px' }} onClick={() => { const tabs=['book','calculator','mybookings','tracking','wallet','reports']; const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>←</button>
             <h2 style={{ ...s.pageTitle, fontSize: isSmall ? '16px' : '20px' }}>
               {mobileNavItems.find(n => n.id === activeTab)?.icon}{' '}
               {mobileNavItems.find(n => n.id === activeTab)?.label}
@@ -753,7 +754,7 @@ alert(String.fromCodePoint(0x2705) + ' Payment Successful!\nRs.' + amt.toLocaleS
             </div>
             <p style={{ color: '#e94560', fontSize: '11px', textAlign: 'center', margin: '10px 0 15px' }}>No Bank Refund — Wallet Credit Only</p>
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button style={s.cancelBtn} onClick={() => setShowCancelModal(false)}>Back</button>
+              <button style={s.cancelBtn} onClick={() => setShowCancelModal(false)}>?</button>
               <button style={{ ...s.confirmBtn, background: 'linear-gradient(135deg, #c0392b, #e74c3c)' }} onClick={handleConfirmCancel}>Confirm Cancel</button>
             </div>
           </div>
@@ -851,5 +852,9 @@ const s = {
 };
 
 export default ClientDashboard;
+
+
+
+
 
 

@@ -1,3 +1,4 @@
+import BackButton from '../components/BackButton';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
@@ -137,7 +138,7 @@ const OperatorDashboard = () => {
   return (
     <div style={s.container}>
 
-      {/* ═══ MOBILE LAYOUT ═══ */}
+      {/* --- MOBILE LAYOUT --- */}
       {isSmall && (
         <>
           {/* Top Bar */}
@@ -166,9 +167,9 @@ const OperatorDashboard = () => {
                   <div style={s.drawerAvatar}>{OPERATOR.name.charAt(0)}</div>
                   <div style={{ flex: 1 }}>
                     <p style={{ color: '#c9a84c', fontWeight: '700', fontSize: '14px', margin: 0 }}>{OPERATOR.name}</p>
-                    <p style={{ color: '#8896a8', fontSize: '11px', margin: 0 }}>{String.fromCodePoint(0x2B50)} {OPERATOR.rating} · {OPERATOR.exp}</p>
+                    <p style={{ color: '#8896a8', fontSize: '11px', margin: 0 }}>{String.fromCodePoint(0x2B50)} {OPERATOR.rating} � {OPERATOR.exp}</p>
                   </div>
-                  <button style={s.closeBtn} onClick={() => setMenuOpen(false)}>✕</button>
+                  <button style={s.closeBtn} onClick={() => setMenuOpen(false)}>?</button>
                 </div>
 
                 {/* Machine Status */}
@@ -191,7 +192,7 @@ const OperatorDashboard = () => {
                       onClick={() => { setActiveTab(item.id); setMenuOpen(false); }}>
                       <span style={{ fontSize: '20px', minWidth: '28px' }}>{item.icon}</span>
                       <span style={{ flex: 1, fontSize: '14px' }}>{item.label}</span>
-                      {activeTab === item.id && <span style={{ color: '#c9a84c', fontSize: '12px' }}>●</span>}
+                      {activeTab === item.id && <span style={{ color: '#c9a84c', fontSize: '12px' }}>?</span>}
                     </button>
                   ))}
                 </div>
@@ -201,7 +202,7 @@ const OperatorDashboard = () => {
                 {/* Logout */}
                 <div style={{ padding: '12px 16px' }}>
                   <button style={s.drawerLogout} onClick={() => navigate('/')}>
-                    🚪 Logout
+                    ?? Logout
                   </button>
                 </div>
               </div>
@@ -223,7 +224,7 @@ const OperatorDashboard = () => {
         </>
       )}
 
-      {/* ═══ DESKTOP SIDEBAR ═══ */}
+      {/* --- DESKTOP SIDEBAR --- */}
       {!isSmall && (
         <div style={s.sidebar}>
           <div style={s.sidebarLogo}>
@@ -238,7 +239,7 @@ const OperatorDashboard = () => {
             <div style={s.opAvatar}>{OPERATOR.name.charAt(0)}</div>
             <div>
               <p style={s.opName}>{OPERATOR.name}</p>
-              <p style={s.opSub}>{String.fromCodePoint(0x2B50)} {OPERATOR.rating} · {OPERATOR.exp}</p>
+              <p style={s.opSub}>{String.fromCodePoint(0x2B50)} {OPERATOR.rating} � {OPERATOR.exp}</p>
             </div>
           </div>
           <div style={s.divider} />
@@ -257,21 +258,21 @@ const OperatorDashboard = () => {
             </div>
             <p style={{ ...s.msLabel, color: fuelColor }}>{String.fromCodePoint(0x26FD)} Fuel: {fuelLevel}%</p>
           </div>
-          <button style={s.logoutBtn} onClick={() => navigate('/')}>🚪 Logout</button>
-          <p style={s.sidebarFooter}>Since 2011 · 15 Yrs Excellence</p>
+          <button style={s.logoutBtn} onClick={() => navigate('/')}>?? Logout</button>
+          <p style={s.sidebarFooter}>Since 2011 � 15 Yrs Excellence</p>
         </div>
       )}
 
-      {/* ═══ MAIN CONTENT ═══ */}
+      {/* --- MAIN CONTENT --- */}
       <div style={{ ...s.main, padding: isSmall ? '66px 12px 72px' : '25px' }}>
 
         {/* Header */}
         <div style={{ ...s.header, marginBottom: isSmall ? '14px' : '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            {activeTab !== 'home' && (
+            {activeTab !== 'dashboard' && (
               <button style={s.backBtn}
                 onClick={() => { const tabs = NAV.map(n => n.id); const i = tabs.indexOf(activeTab); if (i > 0) setActiveTab(tabs[i - 1]); }}>
-                ← Back
+                ←
               </button>
             )}
             <div>
@@ -279,7 +280,7 @@ const OperatorDashboard = () => {
                 {currentNavItem?.icon} {currentNavItem?.label}
               </h2>
               <p style={s.pageDate}>
-                {String.fromCodePoint(0x1F4C5)} {currentTime.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' })} · {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                {String.fromCodePoint(0x1F4C5)} {currentTime.toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short' })} � {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
           </div>
@@ -294,7 +295,7 @@ const OperatorDashboard = () => {
           )}
         </div>
 
-        {/* ═══ HOME TAB ═══ */}
+        {/* --- HOME TAB --- */}
         {activeTab === 'home' && (
           <div>
             {/* Stats */}
@@ -317,7 +318,7 @@ const OperatorDashboard = () => {
             <div style={{ ...s.machineBanner, borderColor: machineStarted ? '#4CAF50' : '#FF9800', background: machineStarted ? 'rgba(76,175,80,0.08)' : 'rgba(255,152,0,0.08)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: machineStarted ? '#4CAF50' : '#FF9800', display: 'inline-block', boxShadow: `0 0 8px ${machineStarted ? '#4CAF50' : '#FF9800'}` }}></span>
-                <span style={{ color: machineStarted ? '#4CAF50' : '#FF9800', fontWeight: '700', fontSize: '13px' }}>{OPERATOR.machineId} — {machineStarted ? 'RUNNING' : 'STOPPED'}</span>
+                <span style={{ color: machineStarted ? '#4CAF50' : '#FF9800', fontWeight: '700', fontSize: '13px' }}>{OPERATOR.machineId} � {machineStarted ? 'RUNNING' : 'STOPPED'}</span>
               </div>
               <span style={{ color: '#8896a8', fontSize: '11px' }}>{String.fromCodePoint(0x1F4CD)} {OPERATOR.site}</span>
             </div>
@@ -363,7 +364,7 @@ const OperatorDashboard = () => {
 
             {/* Fuel Gauge */}
             <div style={s.card}>
-              <h3 style={s.cardTitle}>{String.fromCodePoint(0x26FD)} Fuel Level — Omnicomm Sensor</h3>
+              <h3 style={s.cardTitle}>{String.fromCodePoint(0x26FD)} Fuel Level � Omnicomm Sensor</h3>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                 <div style={s.fuelGaugeWrap}>
                   <div style={{ ...s.fuelGaugeFill, height: `${fuelLevel}%`, background: `linear-gradient(180deg, ${fuelColor}, ${fuelColor}88)` }} />
@@ -386,7 +387,7 @@ const OperatorDashboard = () => {
           </div>
         )}
 
-        {/* ═══ ATTENDANCE TAB ═══ */}
+        {/* --- ATTENDANCE TAB --- */}
         {activeTab === 'attendance' && (
           <div>
             <div style={{ ...s.card, textAlign: 'center', padding: '24px 16px', marginBottom: '12px' }}>
@@ -443,11 +444,11 @@ const OperatorDashboard = () => {
           </div>
         )}
 
-        {/* ═══ MACHINE LOG TAB ═══ */}
+        {/* --- MACHINE LOG TAB --- */}
         {activeTab === 'machinelog' && (
           <div>
             <div style={s.card}>
-              <h3 style={s.cardTitle}>{String.fromCodePoint(0x1F69C)} Machine Control — {OPERATOR.machineId}</h3>
+              <h3 style={s.cardTitle}>{String.fromCodePoint(0x1F69C)} Machine Control � {OPERATOR.machineId}</h3>
               <div style={{ display: 'grid', gridTemplateColumns: isSmall ? '1fr' : '1fr 1fr', gap: '12px', marginBottom: '14px' }}>
                 <div style={{ borderRadius: '12px', padding: '20px', textAlign: 'center', background: machineStarted ? 'rgba(76,175,80,0.08)' : 'rgba(233,69,96,0.08)', border: `2px solid ${machineStarted ? '#4CAF50' : '#e94560'}` }}>
                   <p style={{ fontSize: '40px', margin: '0 0 8px' }}>{machineStarted ? String.fromCodePoint(0x1F7E2) : String.fromCodePoint(0x1F534)}</p>
@@ -460,11 +461,11 @@ const OperatorDashboard = () => {
                   <textarea style={{ ...s.input, height: '70px', resize: 'none', marginBottom: '10px', fontSize: '13px' }} placeholder="Work note (optional)..." value={workNote} onChange={e => setWorkNote(e.target.value)} />
                   {!machineStarted ? (
                     <button style={{ width: '100%', padding: '13px', background: 'linear-gradient(135deg, #2e7d32, #4CAF50)', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '800', cursor: 'pointer' }} onClick={handleMachineStart}>
-                      {String.fromCodePoint(0x1F7E2)} Machine START करा
+                      {String.fromCodePoint(0x1F7E2)} Machine START ???
                     </button>
                   ) : (
                     <button style={{ width: '100%', padding: '13px', background: 'linear-gradient(135deg, #c0392b, #e74c3c)', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '800', cursor: 'pointer' }} onClick={handleMachineStop}>
-                      {String.fromCodePoint(0x1F534)} Machine STOP करा
+                      {String.fromCodePoint(0x1F534)} Machine STOP ???
                     </button>
                   )}
                 </div>
@@ -501,7 +502,7 @@ const OperatorDashboard = () => {
           </div>
         )}
 
-        {/* ═══ FUEL TAB ═══ */}
+        {/* --- FUEL TAB --- */}
         {activeTab === 'fuel' && (
           <div>
             <div style={{ ...s.card, marginBottom: '12px' }}>
@@ -513,7 +514,7 @@ const OperatorDashboard = () => {
                 </div>
                 <div style={{ flex: 1 }}>
                   <p style={{ color: fuelColor, fontSize: '36px', fontWeight: '900', margin: '0 0 4px' }}>{fuelLevel}%</p>
-                  <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 10px' }}>Omnicomm Sensor · 99.2% Accuracy</p>
+                  <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 10px' }}>Omnicomm Sensor � 99.2% Accuracy</p>
                   <input type="range" min="0" max="100" value={fuelLevel} onChange={e => setFuelLevel(Number(e.target.value))} style={{ width: '100%', accentColor: '#c9a84c', marginBottom: '8px' }} />
                   <input style={{ ...s.input, marginBottom: '10px', fontSize: '13px' }} placeholder="Note: Refilled / Fuel used..." value={fuelNote} onChange={e => setFuelNote(e.target.value)} />
                   <button style={s.primaryBtn} onClick={handleFuelUpdate}>
@@ -544,13 +545,13 @@ const OperatorDashboard = () => {
           </div>
         )}
 
-        {/* ═══ DAILY REPORT TAB ═══ */}
+        {/* --- DAILY REPORT TAB --- */}
         {activeTab === 'daily' && (
           <div style={s.card}>
-            <h3 style={s.cardTitle}>{String.fromCodePoint(0x1F4CB)} Daily Work Report — April 2026</h3>
+            <h3 style={s.cardTitle}>{String.fromCodePoint(0x1F4CB)} Daily Work Report � April 2026</h3>
             <div style={{ overflowX: 'auto' }}>
               <table style={s.table}>
-                <thead><tr>{['Date', 'Att', 'Start', 'End', 'HMR', 'Fuel↑', 'Fuel↓', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
+                <thead><tr>{['Date', 'Att', 'Start', 'End', 'HMR', 'Fuel?', 'Fuel?', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
                 <tbody>
                   {dailyReports.map((r, i) => (
                     <tr key={i} style={s.tr}>
@@ -570,12 +571,12 @@ const OperatorDashboard = () => {
           </div>
         )}
 
-        {/* ═══ ISSUES TAB ═══ */}
+        {/* --- ISSUES TAB --- */}
         {activeTab === 'issues' && (
           <div>
             <div style={{ ...s.card, border: '1px solid rgba(233,69,96,0.3)' }}>
-              <h3 style={{ ...s.cardTitle, color: '#e94560' }}>{String.fromCodePoint(0x26A0)} Issue Report करा</h3>
-              <p style={{ color: '#8896a8', fontSize: '12px', marginBottom: '14px' }}>कोणतीही अडचण आल्यास तात्काळ Report करा.</p>
+              <h3 style={{ ...s.cardTitle, color: '#e94560' }}>{String.fromCodePoint(0x26A0)} Issue Report ???</h3>
+              <p style={{ color: '#8896a8', fontSize: '12px', marginBottom: '14px' }}>??????? ???? ?????? ??????? Report ???.</p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
                 {[
                   { id: 'mechanical', icon: String.fromCodePoint(0x1F527), label: 'Mechanical' },
@@ -593,10 +594,10 @@ const OperatorDashboard = () => {
                 ))}
               </div>
               <textarea style={{ ...s.input, height: '80px', resize: 'vertical', marginBottom: '12px', fontSize: '13px' }}
-                placeholder="समस्या सविस्तर सांगा..." value={issueNote} onChange={e => setIssueNote(e.target.value)} />
+                placeholder="?????? ??????? ?????..." value={issueNote} onChange={e => setIssueNote(e.target.value)} />
               <button style={{ ...s.dangerBtn, opacity: (!issueType || !issueNote) ? 0.5 : 1 }}
                 disabled={!issueType || !issueNote} onClick={handleReportIssue}>
-                {String.fromCodePoint(0x1F6A8)} Issue Report Submit करा
+                {String.fromCodePoint(0x1F6A8)} Issue Report Submit ???
               </button>
             </div>
             <div style={s.card}>
@@ -605,7 +606,7 @@ const OperatorDashboard = () => {
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', marginBottom: '8px', borderLeft: `3px solid ${issue.resolved ? '#4CAF50' : '#e94560'}` }}>
                   <span style={{ fontSize: '16px' }}>{String.fromCodePoint(0x26A0)}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ color: '#556070', fontSize: '10px', margin: '0 0 2px' }}>{issue.date} · [{issue.type}]</p>
+                    <p style={{ color: '#556070', fontSize: '10px', margin: '0 0 2px' }}>{issue.date} � [{issue.type}]</p>
                     <p style={{ color: '#e8e0d0', fontSize: '12px', fontWeight: '600', margin: '0 0 2px' }}>{issue.note}</p>
                     <p style={{ color: '#8896a8', fontSize: '11px', margin: 0 }}>{issue.action}</p>
                   </div>
@@ -619,7 +620,7 @@ const OperatorDashboard = () => {
         )}
       </div>
 
-      {/* ═══ FUEL MODAL ═══ */}
+      {/* --- FUEL MODAL --- */}
       {showFuelModal && (
         <div style={s.modalOverlay}>
           <div style={{ ...s.modal, width: isSmall ? '94%' : '360px' }}>
@@ -636,7 +637,7 @@ const OperatorDashboard = () => {
         </div>
       )}
 
-      {/* ═══ ISSUE MODAL ═══ */}
+      {/* --- ISSUE MODAL --- */}
       {showIssueModal && (
         <div style={s.modalOverlay}>
           <div style={{ ...s.modal, width: isSmall ? '94%' : '360px' }}>
@@ -656,7 +657,7 @@ const OperatorDashboard = () => {
               ))}
             </div>
             <textarea style={{ ...s.input, width: '100%', height: '80px', boxSizing: 'border-box', marginBottom: '12px', resize: 'none', fontSize: '13px' }}
-              placeholder="समस्या थोडक्यात सांगा..." value={issueNote} onChange={e => setIssueNote(e.target.value)} />
+              placeholder="?????? ???????? ?????..." value={issueNote} onChange={e => setIssueNote(e.target.value)} />
             <div style={{ display: 'flex', gap: '10px' }}>
               <button style={s.cancelBtn} onClick={() => setShowIssueModal(false)}>Cancel</button>
               <button style={{ ...s.confirmBtn, background: 'linear-gradient(135deg, #c0392b, #e74c3c)' }} onClick={handleReportIssue}>{String.fromCodePoint(0x1F6A8)} Report</button>
@@ -774,3 +775,6 @@ const s = {
 
 export default OperatorDashboard;
 // updated
+
+
+
