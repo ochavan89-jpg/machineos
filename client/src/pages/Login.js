@@ -1,5 +1,5 @@
 import { supabase } from '../supabaseClient';
-import { requestNotificationPermission } from '../firebase';
+// import { requestNotificationPermission } from '../firebase';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -197,4 +197,5 @@ const s = {
 };
 
 export default Login;
+
 

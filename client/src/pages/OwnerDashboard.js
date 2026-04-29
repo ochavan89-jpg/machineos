@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
-import LanguageSelector from '../components/LanguageSelector';
+// import LanguageSelector from '../components/LanguageSelector';
 import { generateOwnerReceipt } from '../services/pdfGenerator';
 import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
-import { getMachines, getAllBookings, getWalletBalance } from '../supabaseService';
+import { getMachines, getAllBookings } from '../supabaseService';
 
 const OWNER_DATA = {
   name: 'Rajesh Patil',
@@ -634,4 +634,5 @@ const s = {
 };
 
 export default OwnerDashboard;
+
 

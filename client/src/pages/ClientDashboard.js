@@ -8,7 +8,7 @@ import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { sendBookingConfirmation } from '../emailService';
 import { sendBookingWhatsApp } from '../whatsappService';
-import { getMachines, createBooking, getWalletBalance, updateWalletBalance, addTransaction, getTransactionsByUser } from '../supabaseService';
+import { getMachines, createBooking, getWalletBalance, updateWalletBalance, addTransaction } from '../supabaseService';
 
 const MACHINES = [];
 
@@ -851,3 +851,4 @@ const s = {
 };
 
 export default ClientDashboard;
+
