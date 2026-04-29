@@ -2,7 +2,7 @@ import { initiatePayment } from '../razorpayService';
 import React, { useState, useEffect,  } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../context/LanguageContext';
-import LanguageSelector from '../components/LanguageSelector';
+// import LanguageSelector from '../components/LanguageSelector';
 import { generateGSTInvoice, generateBookingReport } from '../services/pdfGenerator';
 import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
