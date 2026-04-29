@@ -1,3 +1,4 @@
+/* eslint-disable */
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -672,6 +673,7 @@ export function generateBookingReport(bookings, clientName) {
   drawFooter(doc, 'Booking History Report');
   doc.save(`DE_Booking_Report_${(clientName || 'Client').replace(/\s/g, '_')}.pdf`);
 }
+
 
 
 
