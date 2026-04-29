@@ -70,7 +70,7 @@ const OwnerDashboard = () => {
   useEffect(() => {
     const loadData = async () => {
       const machines = await getMachines();
-      setMachineData(machines);
+      // eslint-disable-next-line no-unused-vars
       const bookings = await getAllBookings();
       // setBookingData(bookings);
     };
