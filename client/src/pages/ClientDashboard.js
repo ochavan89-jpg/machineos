@@ -431,15 +431,15 @@ alert(String.fromCodePoint(0x2705) + ' Payment Successful!\nRs.' + amt.toLocaleS
                           <p style={{ color: '#4CAF50', fontSize: '9px', margin: 0 }}>{tp.rate}</p>
                         </div>
                       ))}
-                    </div>
                   </div>
+
                   <div style={{ marginBottom: '15px' }}>
                     <p style={{ color: '#8896a8', fontSize: '12px', margin: '0 0 6px' }}>{qtyConfig.unit}: <span style={{ color: '#c9a84c', fontWeight: '700' }}>{quantity}</span></p>
                     <input type="range" min={qtyConfig.min} max={qtyConfig.max} value={quantity} onChange={e => setQuantity(Number(e.target.value))} style={{ width: '100%', accentColor: '#c9a84c' }} />
                   </div>
                   <div style={{ marginBottom: '15px' }}>
-                      <BookingCalendar onRangeSelect={(start, end) => { setStartDate(start); setEndDate(end); }} bookingType={bookingType} quantity={quantity} />
-                  <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '12px', marginBottom: '12px' }}>
+                  <BookingCalendar onRangeSelect={(start, end) => { setStartDate(start); setEndDate(end); }} bookingType={bookingType} quantity={quantity} />
+                  </div>
                     {[
                       { label: 'Base Amount', val: 'Rs.' + totalCost.toLocaleString('en-IN') },
                       { label: 'GST @ 18%', val: 'Rs.' + Math.round(totalCost * 0.18).toLocaleString('en-IN') },
@@ -858,6 +858,7 @@ const s = {
 };
 
 export default ClientDashboard;
+
 
 
 
