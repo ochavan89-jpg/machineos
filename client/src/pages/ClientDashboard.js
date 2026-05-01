@@ -61,6 +61,7 @@ const ClientDashboard = () => {
   const [quantity, setQuantity] = useState(3);
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState('');
+
   const [walletBalance, setWalletBalance] = useState(268140);
   const [rechargeAmt, setRechargeAmt] = useState('');
   const [showRecharge, setShowRecharge] = useState(false);
@@ -239,6 +240,7 @@ alert(String.fromCodePoint(0x2705) + ' Payment Successful!\nRs.' + amt.toLocaleS
       default: return { min: 1, max: 30, unit: 'Days' };
     }
   };
+  useEffect(() => { if (!startDate || !endDate) return; const days = Math.max(1, Math.round((new Date(endDate) - new Date(startDate)) / 86400000)); if (bookingType === 'daily') setQuantity(days); else if (bookingType === 'weekly') setQuantity(Math.max(1, Math.ceil(days / 7))); else if (bookingType === 'monthly') setQuantity(Math.max(1, Math.ceil(days / 30))); }, [startDate, endDate, bookingType]);
   const qtyConfig = getQtyConfig();
 
   const mobileNavItems = NAV.map(n => ({ ...n, label: NAV_LABELS[n.label] || n.label }));
@@ -296,9 +298,9 @@ alert(String.fromCodePoint(0x2705) + ' Payment Successful!\nRs.' + amt.toLocaleS
       )}
 
       <div style={{ ...s.main, padding: isSmall ? '70px 12px 70px' : '25px' }}>
-        <div style={{ ...s.header, flexDirection: isSmall ? 'column' : 'row', gap: isSmall ? '8px' : '0' }}>
+        <div style={{ ...s.header, flexDirection: isSmall ? 'column' : 'row', gap: isSmall ? '8px' : '0', alignItems: isSmall ? 'flex-start' : 'center' }}>
           <div>
-            <button style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.25)', color:'#c9a84c', borderRadius:'8px', padding:'4px 10px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px' }} onClick={() => { const tabs=['book','calculator','mybookings','tracking','wallet','reports']; const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>←</button>
+            <button style={{ background:'rgba(201,168,76,0.08)', border:'1px solid rgba(201,168,76,0.2)', color:'#c9a84c', borderRadius:'20px', padding:'5px 12px 5px 8px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px', display:'flex', alignItems:'center', gap:'5px', width:'fit-content' }} onClick={() => { const tabs=['book','calculator','mybookings','tracking','wallet','reports']; const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>&#8592;</button>
             <h2 style={{ ...s.pageTitle, fontSize: isSmall ? '16px' : '20px' }}>
               {mobileNavItems.find(n => n.id === activeTab)?.icon}{' '}
               {mobileNavItems.find(n => n.id === activeTab)?.label}
@@ -432,14 +434,14 @@ alert(String.fromCodePoint(0x2705) + ' Payment Successful!\nRs.' + amt.toLocaleS
                         </div>
                       ))}
                   </div>
+                  {bookingType === 'hourly' && (<div style={{ marginBottom: '15px' }}><p style={{ color: '#8896a8', fontSize: '12px', margin: '0 0 6px' }}>{qtyConfig.unit}: <span style={{ color: '#c9a84c', fontWeight: '700' }}>{quantity}</span></p><input type='range' min={qtyConfig.min} max={qtyConfig.max} value={quantity} onChange={e => setQuantity(Number(e.target.value))} style={{ width: '100%', accentColor: '#c9a84c' }} /></div>)}
+                  {bookingType !== 'hourly' && (<div style={{ marginBottom: '15px' }}><BookingCalendar onRangeSelect={(start, end) => { setStartDate(start); setEndDate(end); const days = Math.max(1, Math.round((new Date(end) - new Date(start)) / 86400000)); if (bookingType === 'daily') setQuantity(days); else if (bookingType === 'weekly') setQuantity(Math.max(1, Math.ceil(days / 7))); else if (bookingType === 'monthly') setQuantity(Math.max(1, Math.ceil(days / 30))); }} bookingType={bookingType} quantity={quantity} /></div>)}
 
-                  <div style={{ marginBottom: '15px' }}>
-                    <p style={{ color: '#8896a8', fontSize: '12px', margin: '0 0 6px' }}>{qtyConfig.unit}: <span style={{ color: '#c9a84c', fontWeight: '700' }}>{quantity}</span></p>
-                    <input type="range" min={qtyConfig.min} max={qtyConfig.max} value={quantity} onChange={e => setQuantity(Number(e.target.value))} style={{ width: '100%', accentColor: '#c9a84c' }} />
-                  </div>
-                  <div style={{ marginBottom: '15px' }}>
-                  <BookingCalendar onRangeSelect={(start, end) => { setStartDate(start); setEndDate(end); }} bookingType={bookingType} quantity={quantity} />
-                  </div>
+
+
+
+
+
                     {[
                       { label: 'Base Amount', val: 'Rs.' + totalCost.toLocaleString('en-IN') },
                       { label: 'GST @ 18%', val: 'Rs.' + Math.round(totalCost * 0.18).toLocaleString('en-IN') },

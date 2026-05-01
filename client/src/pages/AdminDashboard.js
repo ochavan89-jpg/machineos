@@ -130,7 +130,7 @@ const AdminDashboard = () => {
       <div style={{ ...s.main, padding: isSmall ? '70px 12px 70px' : '25px' }}>
         <div style={{ ...s.header, flexDirection: isSmall ? 'column' : 'row', gap: isSmall ? '10px' : '0', alignItems: 'flex-start' }}>
           <div>
-            <button style={{ background:'rgba(201,168,76,0.1)', border:'1px solid rgba(201,168,76,0.25)', color:'#c9a84c', borderRadius:'8px', padding:'4px 10px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px' }} onClick={() => { const tabs=['overview','machines','clients','owners','operators','wallet','reports','iot']; const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>←</button>
+            <button style={{ background:'rgba(201,168,76,0.08)', border:'1px solid rgba(201,168,76,0.2)', color:'#c9a84c', borderRadius:'20px', padding:'5px 12px 5px 8px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px', display:'flex', alignItems:'center', gap:'5px', width:'fit-content' }} onClick={() => { const tabs=['overview','machines','clients','owners','operators','wallet','reports','iot']; const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>&#8592;</button>
             <h2 style={{ ...s.pageTitle, fontSize: isSmall ? '16px' : '22px' }}>
               {NAV.find(n => n.id === activeTab)?.icon}{' '}
               {NAV.find(n => n.id === activeTab)?.label}
