@@ -302,7 +302,7 @@ const AdminDashboard = () => {
                         <td style={s.td}>{c.phone}</td>
                         <td style={s.td}>{c.gstin || 'N/A'}</td>
                         <td style={s.td}>{bookingData.filter(b => b.client_id === c.id).length}</td>
-                        <td style={s.td}><span style={{ ...s.statusBadge, background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50' }}>Active</span></td>
+                        <td style={s.td}><span style={{ ...s.statusBadge, background: c.status === 'active' ? 'rgba(76,175,80,0.15)' : c.status === 'pending' ? 'rgba(255,152,0,0.15)' : 'rgba(233,69,96,0.15)', border: c.status === 'active' ? '1px solid #4CAF50' : c.status === 'pending' ? '1px solid #FF9800' : '1px solid #e94560', color: c.status === 'active' ? '#4CAF50' : c.status === 'pending' ? '#FF9800' : '#e94560' }}>{c.status === 'active' ? 'Active' : c.status === 'pending' ? 'Pending' : 'Rejected'}</span></td>
                       </tr>
                     )) : (
                       <tr><td colSpan="6" style={{ ...s.td, textAlign: 'center', color: '#8896a8' }}>No clients found</td></tr>
@@ -602,14 +602,3 @@ const s = {
 };
 
 export default AdminDashboard;
-
-
-
-
-
-
-
-
-
-
-
