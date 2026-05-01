@@ -1,264 +1,135 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 
-const BOOKED_DATES = ['2026-05-03', '2026-05-04', '2026-05-05', '2026-05-12', '2026-05-13', '2026-05-20'];
+const BOOKED = ['2026-05-03','2026-05-04','2026-05-05','2026-05-12','2026-05-13','2026-05-20'];
 
-const BookingCalendar = ({ onRangeSelect, bookingType, quantity }) => {
+const MiniCal = ({ year, month, startDate, endDate, hoverDate, onDayClick, onHover, onLeave, side }) => {
   const today = new Date();
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth());
-  const [startDate, setStartDate] = useState(null);
-  const [endDate, setEndDate] = useState(null);
-  const [hoverDate, setHoverDate] = useState(null);
-  const [animated, setAnimated] = useState(false);
-
-  useEffect(() => {
-    setAnimated(true);
-  }, [viewMonth]);
-
-  const getDaysInMonth = (y, m) => new Date(y, m + 1, 0).getDate();
-  const getFirstDay = (y, m) => new Date(y, m, 1).getDay();
-
-  const toKey = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-
-  const isBooked = (key) => BOOKED_DATES.includes(key);
-  const isPast = (y, m, d) => new Date(y, m, d) < new Date(today.getFullYear(), today.getMonth(), today.getDate());
-
-  const isInRange = (key) => {
+  const toKey = (y,m,d) => `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  const days = new Date(year, month+1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay();
+  const monthName = new Date(year, month).toLocaleDateString('en-IN',{month:'short', year:'numeric'});
+  const isBooked = k => BOOKED.includes(k);
+  const isPast = (y,m,d) => new Date(y,m,d) < new Date(today.getFullYear(),today.getMonth(),today.getDate());
+  const isInRange = k => {
     if (!startDate) return false;
     const end = endDate || hoverDate;
     if (!end) return false;
-    const s = new Date(startDate), e = new Date(end), k = new Date(key);
-    return k >= Math.min(s, e) && k <= Math.max(s, e);
+    const s=new Date(startDate),e=new Date(end),kd=new Date(k);
+    return kd>Math.min(s,e) && kd<Math.max(s,e);
   };
-
-  const handleDayClick = (key) => {
-    if (isBooked(key) || isPast(...key.split('-').map((v, i) => i === 1 ? Number(v) - 1 : Number(v)))) return;
-    if (!startDate || (startDate && endDate)) {
-      setStartDate(key);
-      setEndDate(null);
-    } else {
-      if (key < startDate) { setStartDate(key); setEndDate(null); return; }
-      setEndDate(key);
-      onRangeSelect && onRangeSelect(startDate, key);
-    }
-  };
-
-  const prevMonth = () => {
-    setAnimated(false);
-    setTimeout(() => {
-      if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); }
-      else setViewMonth(m => m - 1);
-    }, 50);
-  };
-
-  const nextMonth = () => {
-    setAnimated(false);
-    setTimeout(() => {
-      if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); }
-      else setViewMonth(m => m + 1);
-    }, 50);
-  };
-
-  const days = getDaysInMonth(viewYear, viewMonth);
-  const firstDay = getFirstDay(viewYear, viewMonth);
-  const monthName = new Date(viewYear, viewMonth).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-
-  const getNights = () => {
-    if (!startDate || !endDate) return 0;
-    return Math.round((new Date(endDate) - new Date(startDate)) / 86400000);
-  };
-
-  const nights = getNights();
-
   return (
-    <div style={styles.wrapper}>
-      {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.headerGlow} />
-        <div style={styles.headerInner}>
-          <div>
-            <p style={styles.headerLabel}>AVAILABILITY CALENDAR</p>
-            <h3 style={styles.headerTitle}>{monthName}</h3>
-          </div>
-          <div style={styles.navBtns}>
-            <button style={styles.navBtn} onClick={prevMonth}>&#8592;</button>
-            <button style={styles.navBtn} onClick={nextMonth}>&#8594;</button>
-          </div>
+    <div style={{flex:1,minWidth:0}}>
+      <p style={{color:'rgba(201,168,76,0.6)',fontSize:'9px',letterSpacing:'1.5px',margin:'0 0 6px',textAlign:'center',fontWeight:'700'}}>
+        {side==='start'?'CHECK-IN':'CHECK-OUT'}
+      </p>
+      <div style={{background:'linear-gradient(145deg,#0d1f3c,#080f1e)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'10px',overflow:'hidden'}}>
+        <div style={{background:'rgba(201,168,76,0.06)',padding:'6px 8px',textAlign:'center',borderBottom:'1px solid rgba(201,168,76,0.1)'}}>
+          <p style={{color:'#c9a84c',fontSize:'11px',fontWeight:'700',margin:0}}>{monthName}</p>
         </div>
-      </div>
-
-      {/* Legend */}
-      <div style={styles.legend}>
-        {[
-          { color: '#c9a84c', label: 'Selected' },
-          { color: 'rgba(201,168,76,0.15)', label: 'Range' },
-          { color: '#e94560', label: 'Booked' },
-          { color: 'rgba(255,255,255,0.05)', label: 'Available' },
-        ].map((l, i) => (
-          <div key={i} style={styles.legendItem}>
-            <div style={{ ...styles.legendDot, background: l.color, border: l.color === 'rgba(255,255,255,0.05)' ? '1px solid rgba(255,255,255,0.12)' : 'none' }} />
-            <span style={styles.legendText}>{l.label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Day Headers */}
-      <div style={styles.dayHeaders}>
-        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
-          <div key={d} style={styles.dayHeader}>{d}</div>
-        ))}
-      </div>
-
-      {/* Calendar Grid */}
-      <div style={{ ...styles.grid, opacity: animated ? 1 : 0, transition: 'opacity 0.2s' }}>
-        {Array(firstDay).fill(null).map((_, i) => <div key={`e${i}`} />)}
-        {Array(days).fill(null).map((_, i) => {
-          const d = i + 1;
-          const key = toKey(viewYear, viewMonth, d);
-          const booked = isBooked(key);
-          const past = isPast(viewYear, viewMonth, d);
-          const isStart = key === startDate;
-          const isEnd = key === endDate;
-          const inRange = isInRange(key);
-          const isToday = key === toKey(today.getFullYear(), today.getMonth(), today.getDate());
-          const disabled = booked || past;
-
-          return (
-            <div
-              key={key}
-              style={{
-                ...styles.day,
-                ...(disabled ? styles.dayDisabled : styles.dayAvail),
-                ...(isStart || isEnd ? styles.daySelected : {}),
-                ...(inRange && !isStart && !isEnd ? styles.dayRange : {}),
-                ...(isToday && !isStart && !isEnd ? styles.dayToday : {}),
-                ...(booked ? styles.dayBooked : {}),
-              }}
-              onClick={() => handleDayClick(key)}
-              onMouseEnter={() => !endDate && startDate && setHoverDate(key)}
-              onMouseLeave={() => setHoverDate(null)}
-            >
-              <span style={{
-                ...styles.dayNum,
-                color: isStart || isEnd ? '#0a1628' : booked ? '#e94560' : past ? 'rgba(255,255,255,0.2)' : '#e8e0d0',
-                fontWeight: isStart || isEnd || isToday ? '800' : '400',
-              }}>{d}</span>
-              {booked && <span style={styles.bookedDot} />}
-              {isStart && <span style={styles.badge}>S</span>}
-              {isEnd && <span style={styles.badge}>E</span>}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Summary */}
-      <div style={styles.summary}>
-        {startDate && endDate ? (
-          <div style={styles.summaryActive}>
-            <div style={styles.summaryGlow} />
-            <div style={styles.summaryRow}>
-              <div style={styles.summaryItem}>
-                <p style={styles.summaryLabel}>CHECK-IN</p>
-                <p style={styles.summaryVal}>{new Date(startDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</p>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',padding:'5px 4px 2px'}}>
+          {['S','M','T','W','T','F','S'].map((d,i)=>(
+            <div key={i} style={{textAlign:'center',color:'rgba(201,168,76,0.35)',fontSize:'8px',fontWeight:'700',padding:'2px 0'}}>{d}</div>
+          ))}
+        </div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'1px',padding:'2px 4px 6px'}}>
+          {Array(firstDay).fill(null).map((_,i)=><div key={'e'+i}/>)}
+          {Array(days).fill(null).map((_,i)=>{
+            const d=i+1, key=toKey(year,month,d);
+            const booked=isBooked(key), past=isPast(year,month,d);
+            const isStart=key===startDate, isEnd=key===endDate;
+            const inRange=isInRange(key);
+            const isToday=key===toKey(today.getFullYear(),today.getMonth(),today.getDate());
+            const disabled=booked||past;
+            let bg='transparent',border='1px solid transparent',color=disabled?'rgba(255,255,255,0.15)':'#8896a8',fw='400',shadow='none';
+            if(isStart||isEnd){bg='linear-gradient(135deg,#c9a84c,#e2c97e)';border='1px solid #c9a84c';color='#0a1628';fw='800';shadow='0 2px 6px rgba(201,168,76,0.4)';}
+            else if(inRange){bg='rgba(201,168,76,0.12)';border='1px solid rgba(201,168,76,0.15)';color='#c9a84c';fw='600';}
+            else if(booked){bg='rgba(233,69,96,0.08)';border='1px solid rgba(233,69,96,0.2)';color='#e94560';}
+            else if(isToday){border='1px solid rgba(201,168,76,0.4)';color='#c9a84c';fw='700';}
+            return (
+              <div key={key} style={{position:'relative',aspectRatio:'1',borderRadius:'5px',display:'flex',alignItems:'center',justifyContent:'center',cursor:disabled?'not-allowed':'pointer',background:bg,border,color,fontWeight:fw,fontSize:'10px',boxShadow:shadow,transition:'all 0.1s',flexDirection:'column'}}
+                onClick={()=>!disabled&&onDayClick(key)}
+                onMouseEnter={()=>!disabled&&onHover(key)}
+                onMouseLeave={onLeave}
+              >
+                {d}
+                {booked&&<span style={{position:'absolute',bottom:'1px',width:'3px',height:'3px',borderRadius:'50%',background:'#e94560'}}/>}
               </div>
-              <div style={styles.summaryArrow}>
-                <div style={styles.summaryLine} />
-                <span style={styles.summaryNights}>{nights}d</span>
-                <div style={styles.summaryLine} />
-              </div>
-              <div style={styles.summaryItem}>
-                <p style={styles.summaryLabel}>CHECK-OUT</p>
-                <p style={styles.summaryVal}>{new Date(endDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}</p>
-              </div>
-            </div>
-          </div>
-        ) : startDate ? (
-          <div style={styles.summaryPending}>
-            <span style={styles.pulseIcon}>&#128197;</span>
-            <p style={styles.summaryHint}>Now select your <strong style={{ color: '#c9a84c' }}>end date</strong></p>
-          </div>
-        ) : (
-          <div style={styles.summaryEmpty}>
-            <span style={{ fontSize: '20px' }}>&#128197;</span>
-            <p style={styles.summaryHint}>Select <strong style={{ color: '#c9a84c' }}>start date</strong> to begin</p>
-          </div>
-        )}
+            );
+          })}
+        </div>
       </div>
     </div>
   );
 };
 
-const styles = {
-  wrapper: {
-    background: 'linear-gradient(145deg, #0d1f3c, #080f1e)',
-    border: '1px solid rgba(201,168,76,0.25)',
-    borderRadius: '16px',
-    overflow: 'hidden',
-    marginBottom: '15px',
-  },
-  header: {
-    position: 'relative',
-    padding: '16px 18px 12px',
-    borderBottom: '1px solid rgba(201,168,76,0.1)',
-  },
-  headerGlow: {
-    position: 'absolute', top: 0, left: 0, right: 0, height: '100%',
-    background: 'linear-gradient(135deg, rgba(201,168,76,0.06) 0%, transparent 100%)',
-    pointerEvents: 'none',
-  },
-  headerInner: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative' },
-  headerLabel: { color: 'rgba(201,168,76,0.5)', fontSize: '9px', letterSpacing: '2px', margin: '0 0 2px' },
-  headerTitle: { color: '#c9a84c', fontSize: '15px', fontWeight: '700', margin: 0, letterSpacing: '0.5px' },
-  navBtns: { display: 'flex', gap: '6px' },
-  navBtn: {
-    width: '30px', height: '30px', background: 'rgba(201,168,76,0.1)',
-    border: '1px solid rgba(201,168,76,0.25)', borderRadius: '8px',
-    color: '#c9a84c', cursor: 'pointer', fontSize: '14px', display: 'flex',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  legend: { display: 'flex', gap: '14px', padding: '10px 18px', borderBottom: '1px solid rgba(255,255,255,0.04)' },
-  legendItem: { display: 'flex', alignItems: 'center', gap: '5px' },
-  legendDot: { width: '10px', height: '10px', borderRadius: '3px' },
-  legendText: { color: '#556070', fontSize: '9px', letterSpacing: '0.5px' },
-  dayHeaders: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', padding: '8px 12px 4px' },
-  dayHeader: { textAlign: 'center', color: 'rgba(201,168,76,0.4)', fontSize: '10px', letterSpacing: '1px', fontWeight: '600', padding: '4px 0' },
-  grid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '3px', padding: '4px 12px 12px' },
-  day: {
-    position: 'relative', aspectRatio: '1', borderRadius: '8px',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    cursor: 'pointer', transition: 'all 0.15s', flexDirection: 'column', gap: '1px',
-  },
-  dayAvail: { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' },
-  dayDisabled: { cursor: 'not-allowed', background: 'transparent', border: '1px solid transparent' },
-  daySelected: {
-    background: 'linear-gradient(135deg, #c9a84c, #e2c97e)',
-    border: '1px solid #c9a84c',
-    boxShadow: '0 0 12px rgba(201,168,76,0.4)',
-    transform: 'scale(1.05)',
-  },
-  dayRange: { background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.2)' },
-  dayToday: { border: '1px solid rgba(201,168,76,0.5)', background: 'rgba(201,168,76,0.06)' },
-  dayBooked: { background: 'rgba(233,69,96,0.08)', border: '1px solid rgba(233,69,96,0.2)' },
-  dayNum: { fontSize: '12px', lineHeight: 1 },
-  bookedDot: { width: '4px', height: '4px', borderRadius: '50%', background: '#e94560' },
-  badge: {
-    position: 'absolute', top: '2px', right: '3px',
-    fontSize: '7px', color: '#0a1628', fontWeight: '900', letterSpacing: '0.5px',
-  },
-  summary: { borderTop: '1px solid rgba(201,168,76,0.1)', padding: '14px 18px' },
-  summaryActive: { position: 'relative', background: 'rgba(201,168,76,0.06)', borderRadius: '10px', padding: '12px 16px', border: '1px solid rgba(201,168,76,0.2)' },
-  summaryGlow: { position: 'absolute', inset: 0, borderRadius: '10px', background: 'radial-gradient(ellipse at center, rgba(201,168,76,0.04) 0%, transparent 70%)', pointerEvents: 'none' },
-  summaryRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  summaryItem: { textAlign: 'center' },
-  summaryLabel: { color: 'rgba(201,168,76,0.5)', fontSize: '9px', letterSpacing: '1.5px', margin: '0 0 4px' },
-  summaryVal: { color: '#c9a84c', fontSize: '16px', fontWeight: '800', margin: 0 },
-  summaryArrow: { display: 'flex', alignItems: 'center', gap: '8px', flex: 1, justifyContent: 'center' },
-  summaryLine: { flex: 1, height: '1px', background: 'rgba(201,168,76,0.3)' },
-  summaryNights: { color: '#c9a84c', fontSize: '11px', fontWeight: '700', background: 'rgba(201,168,76,0.1)', padding: '3px 8px', borderRadius: '20px', border: '1px solid rgba(201,168,76,0.2)' },
-  summaryPending: { display: 'flex', alignItems: 'center', gap: '10px' },
-  summaryEmpty: { display: 'flex', alignItems: 'center', gap: '10px' },
-  summaryHint: { color: '#556070', fontSize: '12px', margin: 0 },
-  pulseIcon: { fontSize: '20px', animation: 'pulse 1.5s infinite' },
+const BookingCalendar = ({ onRangeSelect }) => {
+  const today = new Date();
+  const [sY,setSY]=useState(today.getFullYear());
+  const [sM,setSM]=useState(today.getMonth());
+  const [eY,setEY]=useState(today.getMonth()===11?today.getFullYear()+1:today.getFullYear());
+  const [eM,setEM]=useState(today.getMonth()===11?0:today.getMonth()+1);
+  const [startDate,setStartDate]=useState(null);
+  const [endDate,setEndDate]=useState(null);
+  const [hoverDate,setHoverDate]=useState(null);
+
+  const handleDayClick = key => {
+    if(!startDate||(startDate&&endDate)){setStartDate(key);setEndDate(null);}
+    else{
+      if(key<=startDate){setStartDate(key);setEndDate(null);return;}
+      setEndDate(key);
+      onRangeSelect&&onRangeSelect(startDate,key);
+    }
+  };
+
+  const nights=startDate&&endDate?Math.round((new Date(endDate)-new Date(startDate))/86400000):0;
+  const nb=(fn,lbl)=><button onClick={fn} style={{width:'20px',height:'20px',background:'rgba(201,168,76,0.1)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'5px',color:'#c9a84c',cursor:'pointer',fontSize:'11px',display:'flex',alignItems:'center',justifyContent:'center'}}>{lbl}</button>;
+
+  const pS=()=>{if(sM===0){setSM(11);setSY(y=>y-1);}else setSM(m=>m-1);};
+  const nS=()=>{if(sM===11){setSM(0);setSY(y=>y+1);}else setSM(m=>m+1);};
+  const pE=()=>{if(eM===0){setEM(11);setEY(y=>y-1);}else setEM(m=>m-1);};
+  const nE=()=>{if(eM===11){setEM(0);setEY(y=>y+1);}else setEM(m=>m+1);};
+
+  return (
+    <div style={{marginBottom:'12px'}}>
+      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
+        <p style={{color:'#8896a8',fontSize:'11px',margin:0,fontWeight:'600'}}>Select Booking Dates</p>
+        {nights>0&&<span style={{background:'rgba(201,168,76,0.1)',border:'1px solid rgba(201,168,76,0.25)',color:'#c9a84c',fontSize:'10px',padding:'2px 8px',borderRadius:'20px',fontWeight:'700'}}>{nights}d</span>}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
+        <div>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>{nb(pS,'‹')}<div/>{nb(nS,'›')}</div>
+          <MiniCal year={sY} month={sM} startDate={startDate} endDate={endDate} hoverDate={hoverDate} onDayClick={handleDayClick} onHover={setHoverDate} onLeave={()=>setHoverDate(null)} side="start"/>
+        </div>
+        <div>
+          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>{nb(pE,'‹')}<div/>{nb(nE,'›')}</div>
+          <MiniCal year={eY} month={eM} startDate={startDate} endDate={endDate} hoverDate={hoverDate} onDayClick={handleDayClick} onHover={setHoverDate} onLeave={()=>setHoverDate(null)} side="end"/>
+        </div>
+      </div>
+      <div style={{marginTop:'8px',background:'rgba(201,168,76,0.05)',border:'1px solid rgba(201,168,76,0.15)',borderRadius:'8px',padding:'8px 12px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <div style={{textAlign:'center'}}>
+          <p style={{color:'rgba(201,168,76,0.5)',fontSize:'8px',letterSpacing:'1px',margin:'0 0 2px'}}>CHECK-IN</p>
+          <p style={{color:startDate?'#c9a84c':'#556070',fontSize:'12px',fontWeight:'700',margin:0}}>{startDate?new Date(startDate).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):'-- ---'}</p>
+        </div>
+        <div style={{flex:1,display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',padding:'0 8px'}}>
+          <div style={{flex:1,height:'1px',background:'rgba(201,168,76,0.2)'}}/> 
+          <span style={{color:nights>0?'#c9a84c':'#556070',fontSize:'9px',fontWeight:'700',background:'rgba(201,168,76,0.08)',padding:'2px 6px',borderRadius:'20px',border:'1px solid rgba(201,168,76,0.15)'}}>{nights>0?nights+'d':'→'}</span>
+          <div style={{flex:1,height:'1px',background:'rgba(201,168,76,0.2)'}}/>
+        </div>
+        <div style={{textAlign:'center'}}>
+          <p style={{color:'rgba(201,168,76,0.5)',fontSize:'8px',letterSpacing:'1px',margin:'0 0 2px'}}>CHECK-OUT</p>
+          <p style={{color:endDate?'#c9a84c':'#556070',fontSize:'12px',fontWeight:'700',margin:0}}>{endDate?new Date(endDate).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):'-- ---'}</p>
+        </div>
+      </div>
+      <div style={{display:'flex',gap:'10px',marginTop:'5px',justifyContent:'center'}}>
+        {[['#c9a84c','Selected'],['rgba(201,168,76,0.2)','Range'],['#e94560','Booked']].map(([c,l],i)=>(
+          <div key={i} style={{display:'flex',alignItems:'center',gap:'3px'}}>
+            <div style={{width:'7px',height:'7px',borderRadius:'2px',background:c}}/>
+            <span style={{color:'#556070',fontSize:'8px'}}>{l}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 export default BookingCalendar;
