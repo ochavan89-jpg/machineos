@@ -22,9 +22,6 @@ function SingleCal({year,month,onPrev,onNext,startDate,endDate,hover,onDay,onHov
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 12px',borderBottom:'1px solid rgba(201,168,76,0.1)',background:'rgba(201,168,76,0.04)'}}>
         <button onClick={onPrev} style={{width:'24px',height:'24px',background:'transparent',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'6px',color:'#c9a84c',cursor:'pointer',fontSize:'12px',display:'flex',alignItems:'center',justifyContent:'center'}}>&#8249;</button>
         <div style={{textAlign:'center'}}>
-          <p style={{color:'rgba(201,168,76,0.5)',fontSize:'8px',letterSpacing:'2px',margin:'0 0 1px',fontWeight:'600'}}>{label}</p>
-          <p style={{color:'#c9a84c',fontSize:'12px',fontWeight:'700',margin:0}}>{MONTHS[month].slice(0,3)} {year}</p>
-        </div>
         <button onClick={onNext} style={{width:'24px',height:'24px',background:'transparent',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'6px',color:'#c9a84c',cursor:'pointer',fontSize:'12px',display:'flex',alignItems:'center',justifyContent:'center'}}>&#8250;</button>
       </div>
       <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',padding:'8px 8px 2px'}}>

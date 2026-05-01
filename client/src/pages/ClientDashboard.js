@@ -439,9 +439,6 @@ alert(String.fromCodePoint(0x2705) + ' Payment Successful!\nRs.' + amt.toLocaleS
                   </div>
                   <div style={{ marginBottom: '15px' }}>
                       <BookingCalendar onRangeSelect={(start, end) => { setStartDate(start); setEndDate(end); }} bookingType={bookingType} quantity={quantity} />
-                      <p style={{ color: '#8896a8', fontSize: '12px', margin: '0 0 6px' }}>Start Date:</p>
-                      <input type="date" value={startDate} min={new Date().toISOString().split('T')[0]} onChange={e => setStartDate(e.target.value)} style={{ width: '100%', padding: '10px 12px', background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '8px', color: '#c9a84c', fontSize: '13px', boxSizing: 'border-box', outline: 'none', cursor: 'pointer' }} />
-                    </div>
                   <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '12px', marginBottom: '12px' }}>
                     {[
                       { label: 'Base Amount', val: 'Rs.' + totalCost.toLocaleString('en-IN') },
