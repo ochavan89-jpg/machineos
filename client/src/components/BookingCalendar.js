@@ -1,135 +1,127 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
+const BOOKED=['2026-05-03','2026-05-04','2026-05-05','2026-05-12','2026-05-13'];
+const toKey=(y,m,d)=>`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+const DAYS=['S','M','T','W','T','F','S'];
+const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-const BOOKED = ['2026-05-03','2026-05-04','2026-05-05','2026-05-12','2026-05-13','2026-05-20'];
-
-const MiniCal = ({ year, month, startDate, endDate, hoverDate, onDayClick, onHover, onLeave, side }) => {
-  const today = new Date();
-  const toKey = (y,m,d) => `${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-  const days = new Date(year, month+1, 0).getDate();
-  const firstDay = new Date(year, month, 1).getDay();
-  const monthName = new Date(year, month).toLocaleDateString('en-IN',{month:'short', year:'numeric'});
-  const isBooked = k => BOOKED.includes(k);
-  const isPast = (y,m,d) => new Date(y,m,d) < new Date(today.getFullYear(),today.getMonth(),today.getDate());
-  const isInRange = k => {
-    if (!startDate) return false;
-    const end = endDate || hoverDate;
-    if (!end) return false;
-    const s=new Date(startDate),e=new Date(end),kd=new Date(k);
-    return kd>Math.min(s,e) && kd<Math.max(s,e);
+function SingleCal({year,month,onPrev,onNext,startDate,endDate,hover,onDay,onHover,onLeave,label}){
+  const today=new Date();
+  const todayKey=toKey(today.getFullYear(),today.getMonth(),today.getDate());
+  const total=new Date(year,month+1,0).getDate();
+  const first=new Date(year,month,1).getDay();
+  const isBooked=k=>BOOKED.includes(k);
+  const isPast=k=>k<todayKey;
+  const isRange=k=>{
+    if(!startDate)return false;
+    const end=endDate||hover;
+    if(!end)return false;
+    return k>Math.min(startDate,end)&&k<Math.max(startDate,end);
   };
-  return (
-    <div style={{flex:1,minWidth:0}}>
-      <p style={{color:'rgba(201,168,76,0.6)',fontSize:'9px',letterSpacing:'1.5px',margin:'0 0 6px',textAlign:'center',fontWeight:'700'}}>
-        {side==='start'?'CHECK-IN':'CHECK-OUT'}
-      </p>
-      <div style={{background:'linear-gradient(145deg,#0d1f3c,#080f1e)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'10px',overflow:'hidden'}}>
-        <div style={{background:'rgba(201,168,76,0.06)',padding:'6px 8px',textAlign:'center',borderBottom:'1px solid rgba(201,168,76,0.1)'}}>
-          <p style={{color:'#c9a84c',fontSize:'11px',fontWeight:'700',margin:0}}>{monthName}</p>
+  return(
+    <div style={{flex:1,background:'#0a1628',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'12px',overflow:'hidden',minWidth:0}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'10px 12px',borderBottom:'1px solid rgba(201,168,76,0.1)',background:'rgba(201,168,76,0.04)'}}>
+        <button onClick={onPrev} style={{width:'24px',height:'24px',background:'transparent',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'6px',color:'#c9a84c',cursor:'pointer',fontSize:'12px',display:'flex',alignItems:'center',justifyContent:'center'}}>&#8249;</button>
+        <div style={{textAlign:'center'}}>
+          <p style={{color:'rgba(201,168,76,0.5)',fontSize:'8px',letterSpacing:'2px',margin:'0 0 1px',fontWeight:'600'}}>{label}</p>
+          <p style={{color:'#c9a84c',fontSize:'12px',fontWeight:'700',margin:0}}>{MONTHS[month].slice(0,3)} {year}</p>
         </div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',padding:'5px 4px 2px'}}>
-          {['S','M','T','W','T','F','S'].map((d,i)=>(
-            <div key={i} style={{textAlign:'center',color:'rgba(201,168,76,0.35)',fontSize:'8px',fontWeight:'700',padding:'2px 0'}}>{d}</div>
-          ))}
-        </div>
-        <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'1px',padding:'2px 4px 6px'}}>
-          {Array(firstDay).fill(null).map((_,i)=><div key={'e'+i}/>)}
-          {Array(days).fill(null).map((_,i)=>{
-            const d=i+1, key=toKey(year,month,d);
-            const booked=isBooked(key), past=isPast(year,month,d);
-            const isStart=key===startDate, isEnd=key===endDate;
-            const inRange=isInRange(key);
-            const isToday=key===toKey(today.getFullYear(),today.getMonth(),today.getDate());
-            const disabled=booked||past;
-            let bg='transparent',border='1px solid transparent',color=disabled?'rgba(255,255,255,0.15)':'#8896a8',fw='400',shadow='none';
-            if(isStart||isEnd){bg='linear-gradient(135deg,#c9a84c,#e2c97e)';border='1px solid #c9a84c';color='#0a1628';fw='800';shadow='0 2px 6px rgba(201,168,76,0.4)';}
-            else if(inRange){bg='rgba(201,168,76,0.12)';border='1px solid rgba(201,168,76,0.15)';color='#c9a84c';fw='600';}
-            else if(booked){bg='rgba(233,69,96,0.08)';border='1px solid rgba(233,69,96,0.2)';color='#e94560';}
-            else if(isToday){border='1px solid rgba(201,168,76,0.4)';color='#c9a84c';fw='700';}
-            return (
-              <div key={key} style={{position:'relative',aspectRatio:'1',borderRadius:'5px',display:'flex',alignItems:'center',justifyContent:'center',cursor:disabled?'not-allowed':'pointer',background:bg,border,color,fontWeight:fw,fontSize:'10px',boxShadow:shadow,transition:'all 0.1s',flexDirection:'column'}}
-                onClick={()=>!disabled&&onDayClick(key)}
-                onMouseEnter={()=>!disabled&&onHover(key)}
-                onMouseLeave={onLeave}
-              >
-                {d}
-                {booked&&<span style={{position:'absolute',bottom:'1px',width:'3px',height:'3px',borderRadius:'50%',background:'#e94560'}}/>}
-              </div>
-            );
-          })}
-        </div>
+        <button onClick={onNext} style={{width:'24px',height:'24px',background:'transparent',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'6px',color:'#c9a84c',cursor:'pointer',fontSize:'12px',display:'flex',alignItems:'center',justifyContent:'center'}}>&#8250;</button>
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',padding:'8px 8px 2px'}}>
+        {DAYS.map((d,i)=><div key={i} style={{textAlign:'center',color:'rgba(201,168,76,0.3)',fontSize:'9px',fontWeight:'700',padding:'2px 0'}}>{d}</div>)}
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(7,1fr)',gap:'2px',padding:'2px 8px 10px'}}>
+        {Array(first).fill(null).map((_,i)=><div key={'e'+i}/>)}
+        {Array(total).fill(null).map((_,i)=>{
+          const d=i+1,k=toKey(year,month,d);
+          const booked=isBooked(k),past=isPast(k);
+          const sel=k===startDate||k===endDate;
+          const inR=isRange(k);
+          const isT=k===todayKey;
+          const dis=booked||past;
+          return(
+            <div key={k} onClick={()=>!dis&&onDay(k)} onMouseEnter={()=>!dis&&onHover(k)} onMouseLeave={onLeave}
+              style={{aspectRatio:'1',borderRadius:'6px',display:'flex',alignItems:'center',justifyContent:'center',cursor:dis?'not-allowed':'pointer',transition:'all 0.1s',fontSize:'10px',fontWeight:sel?'800':isT?'700':'400',
+                background:sel?'linear-gradient(135deg,#b8883c,#e2c97e)':inR?'rgba(201,168,76,0.1)':booked?'rgba(233,69,96,0.08)':'transparent',
+                border:sel?'none':inR?'1px solid rgba(201,168,76,0.12)':booked?'1px solid rgba(233,69,96,0.15)':isT?'1px solid rgba(201,168,76,0.35)':'1px solid transparent',
+                color:sel?'#0a1628':booked?'rgba(233,69,96,0.6)':past?'rgba(255,255,255,0.12)':inR?'#c9a84c':isT?'#c9a84c':'rgba(255,255,255,0.55)',
+                boxShadow:sel?'0 2px 8px rgba(201,168,76,0.35)':'none',transform:sel?'scale(1.06)':'scale(1)',
+              }}>
+              {d}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
-};
+}
 
-const BookingCalendar = ({ onRangeSelect }) => {
-  const today = new Date();
-  const [sY,setSY]=useState(today.getFullYear());
-  const [sM,setSM]=useState(today.getMonth());
-  const [eY,setEY]=useState(today.getMonth()===11?today.getFullYear()+1:today.getFullYear());
-  const [eM,setEM]=useState(today.getMonth()===11?0:today.getMonth()+1);
-  const [startDate,setStartDate]=useState(null);
-  const [endDate,setEndDate]=useState(null);
-  const [hoverDate,setHoverDate]=useState(null);
+export default function BookingCalendar({onRangeSelect}){
+  const today=new Date();
+  const nm=(y,m)=>m===11?[y+1,0]:[y,m+1];
+  const pm=(y,m)=>m===0?[y-1,11]:[y,m-1];
+  const [[sY,sM],setS]=useState([today.getFullYear(),today.getMonth()]);
+  const [[eY,eM],setE]=useState(()=>{const[y,m]=nm(today.getFullYear(),today.getMonth());return[y,m];});
+  const [start,setStart]=useState(null);
+  const [end,setEnd]=useState(null);
+  const [hover,setHover]=useState(null);
 
-  const handleDayClick = key => {
-    if(!startDate||(startDate&&endDate)){setStartDate(key);setEndDate(null);}
+  const click=k=>{
+    if(!start||(start&&end)){setStart(k);setEnd(null);}
     else{
-      if(key<=startDate){setStartDate(key);setEndDate(null);return;}
-      setEndDate(key);
-      onRangeSelect&&onRangeSelect(startDate,key);
+      if(k<=start){setStart(k);setEnd(null);return;}
+      setEnd(k);onRangeSelect&&onRangeSelect(start,k);
     }
   };
+  const nights=start&&end?Math.round((new Date(end)-new Date(start))/86400000):0;
 
-  const nights=startDate&&endDate?Math.round((new Date(endDate)-new Date(startDate))/86400000):0;
-  const nb=(fn,lbl)=><button onClick={fn} style={{width:'20px',height:'20px',background:'rgba(201,168,76,0.1)',border:'1px solid rgba(201,168,76,0.2)',borderRadius:'5px',color:'#c9a84c',cursor:'pointer',fontSize:'11px',display:'flex',alignItems:'center',justifyContent:'center'}}>{lbl}</button>;
+  const fmt=d=>d?new Date(d).toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—';
 
-  const pS=()=>{if(sM===0){setSM(11);setSY(y=>y-1);}else setSM(m=>m-1);};
-  const nS=()=>{if(sM===11){setSM(0);setSY(y=>y+1);}else setSM(m=>m+1);};
-  const pE=()=>{if(eM===0){setEM(11);setEY(y=>y-1);}else setEM(m=>m-1);};
-  const nE=()=>{if(eM===11){setEM(0);setEY(y=>y+1);}else setEM(m=>m+1);};
-
-  return (
-    <div style={{marginBottom:'12px'}}>
-      <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}}>
-        <p style={{color:'#8896a8',fontSize:'11px',margin:0,fontWeight:'600'}}>Select Booking Dates</p>
-        {nights>0&&<span style={{background:'rgba(201,168,76,0.1)',border:'1px solid rgba(201,168,76,0.25)',color:'#c9a84c',fontSize:'10px',padding:'2px 8px',borderRadius:'20px',fontWeight:'700'}}>{nights}d</span>}
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'8px'}}>
-        <div>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>{nb(pS,'‹')}<div/>{nb(nS,'›')}</div>
-          <MiniCal year={sY} month={sM} startDate={startDate} endDate={endDate} hoverDate={hoverDate} onDayClick={handleDayClick} onHover={setHoverDate} onLeave={()=>setHoverDate(null)} side="start"/>
-        </div>
-        <div>
-          <div style={{display:'flex',justifyContent:'space-between',marginBottom:'4px'}}>{nb(pE,'‹')}<div/>{nb(nE,'›')}</div>
-          <MiniCal year={eY} month={eM} startDate={startDate} endDate={endDate} hoverDate={hoverDate} onDayClick={handleDayClick} onHover={setHoverDate} onLeave={()=>setHoverDate(null)} side="end"/>
+  return(
+    <div style={{marginBottom:'14px'}}>
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:'10px'}}>
+        <span style={{color:'#8896a8',fontSize:'11px',fontWeight:'600',letterSpacing:'0.3px'}}>Select Dates</span>
+        <div style={{display:'flex',gap:'6px',alignItems:'center'}}>
+          {nights>0&&<span style={{background:'rgba(201,168,76,0.1)',border:'1px solid rgba(201,168,76,0.2)',color:'#c9a84c',fontSize:'10px',padding:'2px 10px',borderRadius:'20px',fontWeight:'700'}}>{nights} day{nights>1?'s':''}</span>}
+          {(start||end)&&<button onClick={()=>{setStart(null);setEnd(null);}} style={{background:'transparent',border:'none',color:'rgba(255,255,255,0.3)',cursor:'pointer',fontSize:'11px',padding:'2px 6px'}}>reset</button>}
         </div>
       </div>
-      <div style={{marginTop:'8px',background:'rgba(201,168,76,0.05)',border:'1px solid rgba(201,168,76,0.15)',borderRadius:'8px',padding:'8px 12px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <div style={{textAlign:'center'}}>
-          <p style={{color:'rgba(201,168,76,0.5)',fontSize:'8px',letterSpacing:'1px',margin:'0 0 2px'}}>CHECK-IN</p>
-          <p style={{color:startDate?'#c9a84c':'#556070',fontSize:'12px',fontWeight:'700',margin:0}}>{startDate?new Date(startDate).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):'-- ---'}</p>
-        </div>
-        <div style={{flex:1,display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',padding:'0 8px'}}>
-          <div style={{flex:1,height:'1px',background:'rgba(201,168,76,0.2)'}}/> 
-          <span style={{color:nights>0?'#c9a84c':'#556070',fontSize:'9px',fontWeight:'700',background:'rgba(201,168,76,0.08)',padding:'2px 6px',borderRadius:'20px',border:'1px solid rgba(201,168,76,0.15)'}}>{nights>0?nights+'d':'→'}</span>
-          <div style={{flex:1,height:'1px',background:'rgba(201,168,76,0.2)'}}/>
+
+      <div style={{display:'flex',gap:'8px'}}>
+        <SingleCal year={sY} month={sM} label="CHECK-IN"
+          onPrev={()=>setS(([y,m])=>{const[ny,nm2]=pm(y,m);return[ny,nm2];})}
+          onNext={()=>setS(([y,m])=>{const[ny,nm2]=nm(y,m);return[ny,nm2];})}
+          startDate={start} endDate={end} hover={hover} onDay={click} onHover={setHover} onLeave={()=>setHover(null)}/>
+        <SingleCal year={eY} month={eM} label="CHECK-OUT"
+          onPrev={()=>setE(([y,m])=>{const[ny,nm2]=pm(y,m);return[ny,nm2];})}
+          onNext={()=>setE(([y,m])=>{const[ny,nm2]=nm(y,m);return[ny,nm2];})}
+          startDate={start} endDate={end} hover={hover} onDay={click} onHover={setHover} onLeave={()=>setHover(null)}/>
+      </div>
+
+      <div style={{marginTop:'8px',display:'grid',gridTemplateColumns:'1fr auto 1fr',alignItems:'center',gap:'8px',background:'rgba(201,168,76,0.04)',border:'1px solid rgba(201,168,76,0.12)',borderRadius:'10px',padding:'10px 14px'}}>
+        <div>
+          <p style={{color:'rgba(201,168,76,0.45)',fontSize:'8px',letterSpacing:'1.5px',margin:'0 0 3px',fontWeight:'700'}}>CHECK-IN</p>
+          <p style={{color:start?'#c9a84c':'rgba(255,255,255,0.25)',fontSize:'12px',fontWeight:start?'700':'400',margin:0}}>{fmt(start)}</p>
         </div>
         <div style={{textAlign:'center'}}>
-          <p style={{color:'rgba(201,168,76,0.5)',fontSize:'8px',letterSpacing:'1px',margin:'0 0 2px'}}>CHECK-OUT</p>
-          <p style={{color:endDate?'#c9a84c':'#556070',fontSize:'12px',fontWeight:'700',margin:0}}>{endDate?new Date(endDate).toLocaleDateString('en-IN',{day:'2-digit',month:'short'}):'-- ---'}</p>
+          <div style={{width:'28px',height:'1px',background:'rgba(201,168,76,0.2)',margin:'0 auto 4px'}}/>
+          <span style={{color:nights>0?'#c9a84c':'rgba(255,255,255,0.2)',fontSize:'9px',fontWeight:'700'}}>{nights>0?`${nights}d`:'→'}</span>
+          <div style={{width:'28px',height:'1px',background:'rgba(201,168,76,0.2)',margin:'4px auto 0'}}/>
+        </div>
+        <div style={{textAlign:'right'}}>
+          <p style={{color:'rgba(201,168,76,0.45)',fontSize:'8px',letterSpacing:'1.5px',margin:'0 0 3px',fontWeight:'700'}}>CHECK-OUT</p>
+          <p style={{color:end?'#c9a84c':'rgba(255,255,255,0.25)',fontSize:'12px',fontWeight:end?'700':'400',margin:0}}>{fmt(end)}</p>
         </div>
       </div>
-      <div style={{display:'flex',gap:'10px',marginTop:'5px',justifyContent:'center'}}>
-        {[['#c9a84c','Selected'],['rgba(201,168,76,0.2)','Range'],['#e94560','Booked']].map(([c,l],i)=>(
-          <div key={i} style={{display:'flex',alignItems:'center',gap:'3px'}}>
-            <div style={{width:'7px',height:'7px',borderRadius:'2px',background:c}}/>
-            <span style={{color:'#556070',fontSize:'8px'}}>{l}</span>
+
+      <div style={{display:'flex',gap:'12px',marginTop:'6px',justifyContent:'center',alignItems:'center'}}>
+        {[['linear-gradient(135deg,#b8883c,#e2c97e)','Selected'],['rgba(201,168,76,0.1)','Range'],['rgba(233,69,96,0.08)','Booked']].map(([bg,l],i)=>(
+          <div key={i} style={{display:'flex',alignItems:'center',gap:'4px'}}>
+            <div style={{width:'8px',height:'8px',borderRadius:'3px',background:bg,border:i===1?'1px solid rgba(201,168,76,0.12)':i===2?'1px solid rgba(233,69,96,0.15)':'none'}}/>
+            <span style={{color:'rgba(255,255,255,0.3)',fontSize:'9px'}}>{l}</span>
           </div>
         ))}
       </div>
     </div>
   );
-};
-
-export default BookingCalendar;
+}
