@@ -6,7 +6,7 @@ import LanguageSelector from '../components/LanguageSelector';
 import { generateInternalLedger } from '../services/pdfGenerator';
 import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
-import { getMachines, getAllBookings, getAllUsers, getAllTransactions, getAllIssues } from '../supabaseService';
+import { getMachines, getAllBookings, getAllUsers, getAllTransactions, getAllIssues, getPendingUsers, approveUser, rejectUser } from '../supabaseService';
 
 const NAV = [
   { id: 'overview', icon: String.fromCodePoint(0x1F4CA), label: 'Overview' },
@@ -15,8 +15,8 @@ const NAV = [
   { id: 'owners', icon: String.fromCodePoint(0x1F3D7), label: 'Owners' },
   { id: 'operators', icon: String.fromCodePoint(0x1F527), label: 'Operators' },
   { id: 'wallet', icon: String.fromCodePoint(0x1F4B3), label: 'Wallet & Billing' },
+  { id: 'approvals', icon: String.fromCodePoint(0x23F3), label: 'Approvals' },
   { id: 'reports', icon: String.fromCodePoint(0x1F4C8), label: 'Reports' },
-  { id: 'iot', icon: String.fromCodePoint(0x1F4E1), label: 'IoT & GPS' },
 ];
 
 const AdminDashboard = () => {
@@ -32,6 +32,7 @@ const AdminDashboard = () => {
   const [transactionData, setTransactionData] = useState([]);
   const [issueData, setIssueData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [pendingUsers, setPendingUsers] = useState([]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -48,6 +49,8 @@ const AdminDashboard = () => {
       setTransactionData(transactions);
       setIssueData(issues);
       setLoading(false);
+      const pending = await getPendingUsers();
+      setPendingUsers(pending);
     };
     loadData();
   }, []);
@@ -408,7 +411,39 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* REPORTS TAB */}
+                {/* APPROVALS TAB */}
+        {!loading && activeTab === 'approvals' && (
+          <div style={s.tableCard}>
+            <h3 style={s.tableTitle}>Pending Client Approvals ({pendingUsers.length})</h3>
+            {pendingUsers.length === 0 ? (
+              <p style={{ color: '#8896a8', textAlign: 'center', padding: '20px' }}>No pending approvals!</p>
+            ) : (
+              <table style={s.table}>
+                <thead><tr>{['Name','Company','Email','Phone','GSTIN','Date','Action'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
+                <tbody>
+                  {pendingUsers.map((u, i) => (
+                    <tr key={i} style={s.tr}>
+                      <td style={s.td}>{u.name}</td>
+                      <td style={s.td}>{u.company || '-'}</td>
+                      <td style={s.td}>{u.email}</td>
+                      <td style={s.td}>{u.phone}</td>
+                      <td style={s.td}>{u.gstin || '-'}</td>
+                      <td style={s.td}>{new Date(u.created_at).toLocaleDateString('en-IN')}</td>
+                      <td style={s.td}>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button style={{ background: 'rgba(76,175,80,0.1)', border: '1px solid #4CAF50', color: '#4CAF50', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }} onClick={async () => { await approveUser(u.id); setPendingUsers(prev => prev.filter(p => p.id !== u.id)); alert('Approved!'); }}>Approve</button>
+                          <button style={{ background: 'rgba(233,69,96,0.1)', border: '1px solid #e94560', color: '#e94560', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }} onClick={async () => { await rejectUser(u.id); setPendingUsers(prev => prev.filter(p => p.id !== u.id)); alert('Rejected!'); }}>Reject</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        )}
+
+{/* REPORTS TAB */}
         {!loading && activeTab === 'reports' && (
           <div>
             <div style={{ ...s.cardRow, gridTemplateColumns: isSmall ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)' }}>
@@ -567,6 +602,14 @@ const s = {
 };
 
 export default AdminDashboard;
+
+
+
+
+
+
+
+
 
 
 

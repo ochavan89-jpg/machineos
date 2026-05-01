@@ -207,3 +207,21 @@ export const updateMachineFuel = async (machineId, fuelLevel) => {
   if (error) { console.error(error); return false; }
   return true;
 };
+export const getPendingUsers = async () => {
+  const { data, error } = await supabase.from('users').select('*').eq('status', 'pending').order('created_at', { ascending: false });
+  if (error) { console.error(error); return []; }
+  return data || [];
+};
+
+export const approveUser = async (userId) => {
+  const { error } = await supabase.from('users').update({ status: 'active' }).eq('id', userId);
+  if (error) { console.error(error); return false; }
+  await supabase.from('wallets').upsert({ user_id: userId, balance: 0 });
+  return true;
+};
+
+export const rejectUser = async (userId) => {
+  const { error } = await supabase.from('users').update({ status: 'rejected' }).eq('id', userId);
+  if (error) { console.error(error); return false; }
+  return true;
+};
