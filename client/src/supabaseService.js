@@ -225,3 +225,22 @@ export const rejectUser = async (userId) => {
   if (error) { console.error(error); return false; }
   return true;
 };
+
+export const getOwnerBookings = async () => {
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('*, users!bookings_client_id_fkey(name, phone), machines!bookings_machine_id_fkey(machine_id, name)')
+    .order('created_at', { ascending: false });
+  if (error) { console.error(error); return []; }
+  return data || [];
+};
+
+export const approveBooking = async (bookingId) => {
+  const { error } = await supabase
+    .from('bookings')
+    .update({ owner_approved: true, owner_approved_at: new Date().toISOString() })
+    .eq('id', bookingId);
+  if (error) { console.error(error); return false; }
+  return true;
+};
+

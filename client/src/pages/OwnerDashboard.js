@@ -7,6 +7,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { generateOwnerReceipt } from '../services/pdfGenerator';
 import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
+import { getOwnerBookings, approveBooking } from '../supabaseService';
 import { getMachines, getAllBookings } from '../supabaseService';
 
 const OWNER_DATA = {
@@ -42,13 +43,101 @@ const ALERTS = [
 
 const NAV = [
   { id: 'dashboard', icon: String.fromCodePoint(0x1F4CA), label: 'Dashboard' },
+  { id: 'bookings', icon: String.fromCodePoint(0x1F4CB), label: 'Bookings' },
   { id: 'machines', icon: String.fromCodePoint(0x1F69C), label: 'My Machines' },
   { id: 'register', icon: String.fromCodePoint(0x1F4DD), label: 'Register Machine' },
   { id: 'tracking', icon: String.fromCodePoint(0x1F4CD), label: 'GPS Tracking' },
   { id: 'reports', icon: String.fromCodePoint(0x1F4B0), label: 'Reports & Pay' },
   { id: 'alerts', icon: String.fromCodePoint(0x1F514), label: 'Alerts' },
   { id: 'support', icon: String.fromCodePoint(0x1F198), label: 'Support' },
+
 ];
+const OwnerMonthAccordion = ({ month, days, isSmall, s, setOwnerBookings, ownerBookings }) => {
+  const [open, setOpen] = React.useState(false);
+  const [openDay, setOpenDay] = React.useState(null);
+  const total = Object.values(days).flat().length;
+  const pending = Object.values(days).flat().filter(b => !b.owner_approved).length;
+  return (
+    <div style={{ marginBottom: '12px', border: pending > 0 ? '1px solid rgba(255,152,0,0.4)' : '1px solid rgba(201,168,76,0.2)', borderRadius: '12px', overflow: 'hidden' }}>
+      <div onClick={() => setOpen(!open)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: 'linear-gradient(135deg, #0f2040, #0a1628)', cursor: 'pointer' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '18px' }}>{String.fromCodePoint(0x1F4C5)}</span>
+          <span style={{ color: '#c9a84c', fontWeight: '700', fontSize: '15px' }}>{month}</span>
+          <span style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.3)', color: '#c9a84c', padding: '2px 10px', borderRadius: '20px', fontSize: '11px' }}>{total} bookings</span>
+          {pending > 0 && <span style={{ background: 'rgba(255,152,0,0.15)', border: '1px solid #FF9800', color: '#FF9800', padding: '2px 10px', borderRadius: '20px', fontSize: '11px' }}>{pending} pending</span>}
+        </div>
+        <span style={{ color: '#c9a84c', fontSize: '18px' }}>{open ? String.fromCodePoint(0x25B2) : String.fromCodePoint(0x25BC)}</span>
+      </div>
+      {open && (
+        <div style={{ padding: '10px' }}>
+          {Object.entries(days).map(([day, bookings]) => (
+            <div key={day} style={{ marginBottom: '8px', border: '1px solid rgba(201,168,76,0.1)', borderRadius: '10px', overflow: 'hidden' }}>
+              <div onClick={() => setOpenDay(openDay === day ? null : day)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(201,168,76,0.05)', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ color: '#8896a8', fontSize: '12px' }}>{String.fromCodePoint(0x1F4C6)} {day}</span>
+                  <span style={{ background: 'rgba(76,175,80,0.1)', border: '1px solid rgba(76,175,80,0.3)', color: '#4CAF50', padding: '1px 8px', borderRadius: '20px', fontSize: '10px' }}>{bookings.length} bookings</span>
+                  {bookings.filter(b => !b.owner_approved).length > 0 && <span style={{ background: 'rgba(255,152,0,0.15)', border: '1px solid #FF9800', color: '#FF9800', padding: '1px 8px', borderRadius: '20px', fontSize: '10px' }}>{bookings.filter(b => !b.owner_approved).length} pending</span>}
+                </div>
+                <span style={{ color: '#c9a84c', fontSize: '14px' }}>{openDay === day ? String.fromCodePoint(0x25B2) : String.fromCodePoint(0x25BC)}</span>
+              </div>
+              {openDay === day && (
+                <div style={{ padding: '8px' }}>
+                  {bookings.map((b, i) => {
+                    const t = new Date(b.created_at);
+                    return (
+                      <div key={i} style={{ background: 'linear-gradient(135deg, #0a1628, #060e1c)', border: b.owner_approved ? '1px solid rgba(76,175,80,0.3)' : '1px solid rgba(255,152,0,0.3)', borderRadius: '10px', padding: '14px', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                          <div>
+                            <span style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', color: '#c9a84c', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>{b.booking_ref}</span>
+                            <span style={{ marginLeft: '8px', color: '#8896a8', fontSize: '11px' }}>{t.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <span style={{ background: b.owner_approved ? 'rgba(76,175,80,0.15)' : 'rgba(255,152,0,0.15)', border: b.owner_approved ? '1px solid #4CAF50' : '1px solid #FF9800', color: b.owner_approved ? '#4CAF50' : '#FF9800', padding: '3px 10px', borderRadius: '20px', fontSize: '11px' }}>{b.owner_approved ? String.fromCodePoint(0x2705) + ' Approved' : String.fromCodePoint(0x23F3) + ' Pending'}</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: isSmall ? 'repeat(2,1fr)' : 'repeat(3,1fr)', gap: '8px', marginBottom: '12px' }}>
+                          {[
+                            { label: 'Client', val: b.users ? b.users.name : 'N/A' },
+                            { label: 'Machine', val: b.machines ? b.machines.machine_id + ' - ' + b.machines.name : 'N/A' },
+                            { label: 'Type', val: b.booking_type },
+                            { label: 'Location', val: b.location || 'N/A' },
+                            { label: 'Amount', val: 'Rs.' + (b.base_amount || 0).toLocaleString('en-IN') },
+                            { label: 'Advance', val: 'Rs.' + (b.advance_paid || 0).toLocaleString('en-IN') },
+                          ].map((d, j) => (
+                            <div key={j} style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px' }}>
+                              <p style={{ color: '#8896a8', fontSize: '9px', margin: '0 0 3px' }}>{d.label}</p>
+                              <p style={{ color: '#e8e0d0', fontSize: '12px', fontWeight: '600', margin: 0 }}>{d.val}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {!b.owner_approved && (
+                          <button style={{ width: '100%', padding: '11px', background: 'linear-gradient(135deg, #2e7d32, #4CAF50)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}
+                            onClick={async () => {
+                              const { approveBooking } = await import('../supabaseService');
+                              await approveBooking(b.id);
+                              setOwnerBookings(prev => prev.map(x => x.id === b.id ? { ...x, owner_approved: true } : x));
+                              fetch('https://xoqolkqsdkfwxveuwlow.supabase.co/functions/v1/send_whatsapp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: '+918408000084', message: 'Owner Approved!\\nRef: ' + b.booking_ref + '\\nMachine: ' + (b.machines ? b.machines.machine_id : 'N/A') + '\\nLocation: ' + (b.location || 'N/A') }) }).catch(() => {});
+                              alert('Approved! Machine dispatched.');
+                            }}>
+                            {String.fromCodePoint(0x2705)} Approve & Dispatch Machine
+                          </button>
+                        )}
+                        {b.owner_approved && b.owner_approved_at && (
+                          <div style={{ padding: '8px 10px', background: 'rgba(76,175,80,0.08)', border: '1px solid rgba(76,175,80,0.3)', borderRadius: '8px', textAlign: 'center' }}>
+                            <span style={{ color: '#4CAF50', fontSize: '11px' }}>{String.fromCodePoint(0x2705)} Machine Dispatched - {new Date(b.owner_approved_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 const OwnerDashboard = () => {
   const navigate = useNavigate();
@@ -59,6 +148,7 @@ const OwnerDashboard = () => {
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [regStep, setRegStep] = useState(1);
+  const [ownerBookings, setOwnerBookings] = useState([]);
   const [regData, setRegData] = useState({
     ownerName: OWNER_DATA.name, ownerPhone: OWNER_DATA.phone, ownerEmail: OWNER_DATA.email,
     machineName: '', machineType: '', regNo: '', year: '', capacity: '',
@@ -78,6 +168,7 @@ const OwnerDashboard = () => {
       // setBookingData(bookings);
     };
     loadData();
+    getOwnerBookings().then(setOwnerBookings);
   }, []);
 
   
@@ -165,6 +256,33 @@ const OwnerDashboard = () => {
         </div>
 
         {/* ═══ TAB: DASHBOARD ═══ */}
+        {activeTab === 'bookings' && (
+          <div>
+            <div style={{ display: 'grid', gridTemplateColumns: isSmall ? 'repeat(2,1fr)' : 'repeat(3,1fr)', gap: '12px', marginBottom: '20px' }}>
+              {[
+                { icon: String.fromCodePoint(0x1F4CB), val: ownerBookings.length.toString(), label: 'Total Bookings' },
+                { icon: String.fromCodePoint(0x23F3), val: ownerBookings.filter(b => !b.owner_approved).length.toString(), label: 'Pending Approval' },
+                { icon: String.fromCodePoint(0x2705), val: ownerBookings.filter(b => b.owner_approved).length.toString(), label: 'Approved' },
+              ].map((c, i) => (
+                <div key={i} style={s.card}><p style={{ fontSize: '22px', margin: '0 0 6px' }}>{c.icon}</p><h3 style={{ color: '#c9a84c', fontSize: '20px', fontWeight: '700', margin: '0 0 4px' }}>{c.val}</h3><p style={{ color: '#8896a8', fontSize: '11px', margin: 0 }}>{c.label}</p></div>
+              ))}
+            </div>
+            {(() => {
+              const grouped = {};
+              ownerBookings.forEach(b => {
+                const d = new Date(b.created_at || b.start_date);
+                const month = d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+                const day = d.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short' });
+                if (!grouped[month]) grouped[month] = {};
+                if (!grouped[month][day]) grouped[month][day] = [];
+                grouped[month][day].push(b);
+              });
+              return Object.entries(grouped).map(([month, days]) => (
+                <OwnerMonthAccordion key={month} month={month} days={days} isSmall={isSmall} s={s} setOwnerBookings={setOwnerBookings} ownerBookings={ownerBookings} />
+              ));
+                        })()}
+          </div>
+        )}
         {activeTab === 'dashboard' && (
           <div>
             <div style={{ ...s.cardRow, gridTemplateColumns: isSmall ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)' }}>
