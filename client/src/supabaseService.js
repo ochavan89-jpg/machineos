@@ -244,3 +244,4 @@ export const approveBooking = async (bookingId) => {
   return true;
 };
 
+

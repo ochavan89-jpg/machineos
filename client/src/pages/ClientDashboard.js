@@ -10,7 +10,7 @@ import BookingCalendar from '../components/BookingCalendar';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { sendBookingConfirmation } from '../emailService';
 import { sendBookingWhatsApp, sendBookingNotifications, sendWalletNotification } from '../whatsappService';
-import { getMachines, createBooking, getWalletBalance, updateWalletBalance, addTransaction } from '../supabaseService';
+import { getMachines, createBooking, getWalletBalance, updateWalletBalance, addTransaction, getBookingsByClient, getTransactionsByUser } from '../supabaseService';
 
 const MACHINES = [];
 
@@ -48,6 +48,84 @@ const NAV_LABELS = {
   reports: 'Reports',
 };
 
+const ClientMonthAccordion = ({ month, days, isSmall, s, handleCancelRequest }) => {
+  const [open, setOpen] = React.useState(true);
+  const [openDay, setOpenDay] = React.useState(null);
+  const total = Object.values(days).flat().length;
+  const pending = Object.values(days).flat().filter(b => !b.owner_approved).length;
+  return (
+    <div style={{ marginBottom: '12px', border: pending > 0 ? '1px solid rgba(255,152,0,0.3)' : '1px solid rgba(201,168,76,0.2)', borderRadius: '12px', overflow: 'hidden' }}>
+      <div onClick={() => setOpen(!open)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: 'linear-gradient(135deg, #0f2040, #0a1628)', cursor: 'pointer' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '18px' }}>{String.fromCodePoint(0x1F4C5)}</span>
+          <span style={{ color: '#c9a84c', fontWeight: '700', fontSize: '15px' }}>{month}</span>
+          <span style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.3)', color: '#c9a84c', padding: '2px 10px', borderRadius: '20px', fontSize: '11px' }}>{total} bookings</span>
+          {pending > 0 && <span style={{ background: 'rgba(255,152,0,0.15)', border: '1px solid #FF9800', color: '#FF9800', padding: '2px 10px', borderRadius: '20px', fontSize: '11px' }}>{pending} pending dispatch</span>}
+        </div>
+        <span style={{ color: '#c9a84c', fontSize: '18px' }}>{open ? String.fromCodePoint(0x25B2) : String.fromCodePoint(0x25BC)}</span>
+      </div>
+      {open && (
+        <div style={{ padding: '10px' }}>
+          {Object.entries(days).map(([day, bookings]) => (
+            <div key={day} style={{ marginBottom: '8px', border: '1px solid rgba(201,168,76,0.1)', borderRadius: '10px', overflow: 'hidden' }}>
+              <div onClick={() => setOpenDay(openDay === day ? null : day)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(201,168,76,0.05)', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ color: '#8896a8', fontSize: '12px' }}>{String.fromCodePoint(0x1F4C6)} {day}</span>
+                  <span style={{ background: 'rgba(76,175,80,0.1)', border: '1px solid rgba(76,175,80,0.3)', color: '#4CAF50', padding: '1px 8px', borderRadius: '20px', fontSize: '10px' }}>{bookings.length} bookings</span>
+                </div>
+                <span style={{ color: '#c9a84c', fontSize: '14px' }}>{openDay === day ? String.fromCodePoint(0x25B2) : String.fromCodePoint(0x25BC)}</span>
+              </div>
+              {openDay === day && (
+                <div style={{ padding: '8px' }}>
+                  {bookings.map((b, i) => {
+                    const t = new Date(b.created_at || b.start_date);
+                    return (
+                      <div key={i} style={{ background: 'linear-gradient(135deg, #0a1628, #060e1c)', border: b.owner_approved ? '1px solid rgba(76,175,80,0.25)' : '1px solid rgba(255,152,0,0.25)', borderRadius: '10px', padding: '14px', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                            <span style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', color: '#c9a84c', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>{b.booking_ref || b.id}</span>
+                            <span style={{ color: '#8896a8', fontSize: '11px' }}>{t.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <span style={{ background: b.owner_approved ? 'rgba(76,175,80,0.15)' : 'rgba(255,152,0,0.15)', border: b.owner_approved ? '1px solid #4CAF50' : '1px solid #FF9800', color: b.owner_approved ? '#4CAF50' : '#FF9800', padding: '3px 10px', borderRadius: '20px', fontSize: '11px' }}>{b.owner_approved ? String.fromCodePoint(0x2705) + ' Dispatched' : String.fromCodePoint(0x23F3) + ' Awaiting Dispatch'}</span>
+                            <button style={{ background: 'rgba(233,69,96,0.1)', border: '1px solid rgba(233,69,96,0.4)', color: '#e94560', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }} onClick={() => handleCancelRequest(b)}>Cancel</button>
+                          </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: isSmall ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: '8px', marginBottom: '8px' }}>
+                          {[
+                            { label: 'Machine', val: b.machines ? b.machines.machine_id : (b.machine || 'N/A'), icon: String.fromCodePoint(0x1F69C) },
+                            { label: 'Type', val: b.booking_type || b.type || 'N/A', icon: String.fromCodePoint(0x1F4CB) },
+                            { label: 'Location', val: b.location || 'N/A', icon: String.fromCodePoint(0x1F4CD) },
+                            { label: 'Advance Paid', val: 'Rs.' + (b.advance_paid || b.advancePaid || 0).toLocaleString('en-IN'), icon: String.fromCodePoint(0x1F4B0) },
+                            { label: 'Base Amount', val: 'Rs.' + (b.base_amount || b.baseAmt || 0).toLocaleString('en-IN'), icon: String.fromCodePoint(0x1F4C8) },
+                            { label: 'GST 18%', val: 'Rs.' + (b.gst_amount || b.gst || 0).toLocaleString('en-IN'), icon: String.fromCodePoint(0x1F4DC) },
+                            { label: 'Total', val: 'Rs.' + (b.total_amount || b.total || 0).toLocaleString('en-IN'), icon: String.fromCodePoint(0x1F4B3) },
+                            { label: 'Quantity', val: (b.quantity || b.hours || 'N/A') + (b.booking_type === 'hourly' ? ' hrs' : b.booking_type === 'daily' ? ' days' : b.booking_type === 'weekly' ? ' wks' : ' mo'), icon: String.fromCodePoint(0x23F1) },
+                          ].map((d, j) => (
+                            <div key={j} style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px' }}>
+                              <p style={{ color: '#8896a8', fontSize: '9px', margin: '0 0 3px' }}>{d.icon} {d.label}</p>
+                              <p style={{ color: '#e8e0d0', fontSize: '12px', fontWeight: '600', margin: 0 }}>{d.val}</p>
+                            </div>
+                          ))}
+                        </div>
+                        {b.owner_approved && b.owner_approved_at && (
+                          <div style={{ padding: '8px 10px', background: 'rgba(76,175,80,0.08)', border: '1px solid rgba(76,175,80,0.2)', borderRadius: '8px', textAlign: 'center' }}>
+                            <span style={{ color: '#4CAF50', fontSize: '11px' }}>{String.fromCodePoint(0x2705)} Machine Dispatched — {new Date(b.owner_approved_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 const ClientDashboard = () => {
   const navigate = useNavigate();
   useSessionTimeout();
@@ -71,6 +149,7 @@ const ClientDashboard = () => {
   const [cancelBooking, setCancelBooking] = useState(null);
   const [cancelledCredit, setCancelledCredit] = useState(null);
   const [machineList, setMachineList] = useState([]);
+  const [transactionData, setTransactionData] = useState([]);
   const [activeBookings, setActiveBookings] = useState([
     { id: 'BK005', machine: 'JCB-001', machineFull: 'JCB 3DX Backhoe Loader', operator: 'Ramesh Kadam', ratePerHour: 1400, type: 'Daily', startTime: '7:30 AM', hours: 7.5, advancePaid: 4200, status: 'Running', location: 'Karad, Satara', fuel: 72, date: '10 Apr 2026' },
   ]);
@@ -98,6 +177,15 @@ const ClientDashboard = () => {
       }
     };
     loadData();
+    const savedUser = JSON.parse(localStorage.getItem('machineos_user') || '{}');
+    if (savedUser.id) {
+      getBookingsByClient(savedUser.id).then(bks => {
+        if (bks && bks.length > 0) setActiveBookings(bks);
+      });
+      getTransactionsByUser(savedUser.id).then(txns => {
+        if (txns && txns.length > 0) setTransactionData(txns);
+      });
+    }
 
     const walletInterval = setInterval(async () => {
       const user = JSON.parse(localStorage.getItem('machineos_user') || '{}');
@@ -506,7 +594,7 @@ alert(String.fromCodePoint(0x2705) + ' Payment Successful!\nRs.' + amt.toLocaleS
           </div>
         )}
 
-        {activeTab === 'mybookings' && (
+       {activeTab === 'mybookings' && (
           <div>
             {cancelledCredit && (
               <div style={{ background: 'rgba(76,175,80,0.1)', border: '1px solid rgba(76,175,80,0.3)', borderRadius: '10px', padding: '12px 15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
@@ -514,75 +602,42 @@ alert(String.fromCodePoint(0x2705) + ' Payment Successful!\nRs.' + amt.toLocaleS
                 <button style={{ background: 'transparent', border: 'none', color: '#8896a8', cursor: 'pointer', fontSize: '16px' }} onClick={() => setCancelledCredit(null)}>X</button>
               </div>
             )}
-            <div style={{ background: 'rgba(233,69,96,0.06)', border: '1px solid rgba(233,69,96,0.2)', borderRadius: '10px', padding: '12px', marginBottom: '20px' }}>
-              <p style={{ color: '#e94560', fontWeight: '700', fontSize: '12px', margin: '0 0 4px' }}>Cancellation Policy — No Refund</p>
-              <p style={{ color: '#8896a8', fontSize: '11px', margin: 0 }}>1 hour charge deducted on cancel. Balance credited to Wallet. No bank refund.</p>
+            <div style={{ ...s.cardRow, gridTemplateColumns: isSmall ? 'repeat(2,1fr)' : 'repeat(4,1fr)', marginBottom: '20px' }}>
+              {[
+                { icon: String.fromCodePoint(0x1F4CB), val: activeBookings.length.toString(), label: 'Total Bookings' },
+                { icon: String.fromCodePoint(0x2705), val: activeBookings.filter(b => b.owner_approved).length.toString(), label: 'Dispatched' },
+                { icon: String.fromCodePoint(0x23F3), val: activeBookings.filter(b => !b.owner_approved).length.toString(), label: 'Pending Dispatch' },
+                { icon: String.fromCodePoint(0x1F4B0), val: 'Rs.' + activeBookings.reduce((a,b) => a + (b.advance_paid || b.advancePaid || 0), 0).toLocaleString('en-IN'), label: 'Total Advance' },
+              ].map((c, i) => (
+                <div key={i} style={s.card}><p style={s.cardIcon}>{c.icon}</p><h3 style={s.cardVal}>{c.val}</h3><p style={s.cardLbl}>{c.label}</p></div>
+              ))}
             </div>
-            <h3 style={s.sectionTitle}>Active Bookings ({activeBookings.length})</h3>
             {activeBookings.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '40px' }}>
-                <p style={{ fontSize: '40px', margin: '0 0 12px' }}>📋</p>
-                <p style={{ color: '#8896a8', marginBottom: '15px' }}>No active bookings</p>
+              <div style={{ textAlign: 'center', padding: '60px 20px' }}>
+                <p style={{ fontSize: '48px', margin: '0 0 12px' }}>{String.fromCodePoint(0x1F4CB)}</p>
+                <p style={{ color: '#8896a8', marginBottom: '20px' }}>No bookings yet</p>
                 <button style={s.goBtn} onClick={() => setActiveTab('book')}>Book Machine</button>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '25px' }}>
-                {activeBookings.map((b, i) => (
-                  <div key={i} style={{ background: 'linear-gradient(135deg, #0f2040, #0a1628)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '12px', padding: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        <span style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', color: '#c9a84c', padding: '3px 10px', borderRadius: '20px', fontSize: '11px' }}>{b.machine}</span>
-                        <span style={{ background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50', padding: '3px 10px', borderRadius: '20px', fontSize: '11px' }}>{b.status}</span>
-                      </div>
-                      <button style={{ background: 'rgba(233,69,96,0.1)', border: '1px solid rgba(233,69,96,0.4)', color: '#e94560', padding: '5px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }} onClick={() => handleCancelRequest(b)}>Cancel</button>
-                    </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                      {[
-                        { label: 'Operator', val: b.operator },
-                        { label: 'Location', val: b.location },
-                        { label: 'Started', val: b.startTime },
-                        { label: 'Advance', val: 'Rs.' + b.advancePaid.toLocaleString('en-IN') },
-                      ].map((d, j) => (
-                        <div key={j} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '8px' }}>
-                          <p style={{ color: '#8896a8', fontSize: '9px', margin: '0 0 2px' }}>{d.label}</p>
-                          <p style={{ color: '#e8e0d0', fontSize: '12px', fontWeight: '600', margin: 0 }}>{d.val}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+              <div>
+                {(() => {
+                  const grouped = {};
+                  activeBookings.forEach(b => {
+                    const d = new Date(b.created_at || b.start_date);
+                    const month = d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+                    const day = d.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short' });
+                    if (!grouped[month]) grouped[month] = {};
+                    if (!grouped[month][day]) grouped[month][day] = [];
+                    grouped[month][day].push(b);
+                  });
+                  return Object.entries(grouped).map(([month, days]) => (
+                    <ClientMonthAccordion key={month} month={month} days={days} isSmall={isSmall} s={s} handleCancelRequest={handleCancelRequest} />
+                  ));
+                })()}
               </div>
             )}
-            <h3 style={s.sectionTitle}>Booking History</h3>
-            <div style={s.tableCard}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-                <h3 style={{ color: '#c9a84c', margin: 0, fontSize: '14px' }}>All Bookings</h3>
-                <button style={s.downloadBtn} onClick={() => generateGSTInvoice({ invoiceNo: 'DE/INV/2026/041001', invoiceDate: new Date().toLocaleDateString('en-IN'), bookingId: 'BK-2026-041001', clientName: 'Patil Builders Pvt. Ltd.', clientAddr: 'Karad, Satara - 415110', clientGST: '27AABCP1234A1Z5', clientPhone: '+91-9876543210', machineName: 'JCB 3DX Backhoe Loader', operator: 'Ramesh Kadam', location: 'Karad, Satara', workPeriod: '01-10 Apr 2026', hours: 75, ratePerHour: 1400, baseAmount: 105000, advancePaid: 4200 })}>GST Invoice</button>
-              </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ ...s.table, minWidth: '600px' }}>
-                  <thead><tr>{['ID', 'Date', 'Machine', 'Type', 'Hrs', 'Base', 'GST', 'Total', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
-                  <tbody>
-                    {BOOKING_HISTORY.map((b, i) => (
-                      <tr key={i} style={s.tr}>
-                        <td style={{ ...s.td, color: '#c9a84c', fontSize: '11px' }}>{b.id}</td>
-                        <td style={s.td}>{b.date}</td>
-                        <td style={s.td}><span style={s.machineTag}>{b.machine}</span></td>
-                        <td style={s.td}>{b.type}</td>
-                        <td style={s.td}>{b.hours}</td>
-                        <td style={s.td}>Rs.{b.baseAmt.toLocaleString('en-IN')}</td>
-                        <td style={s.td}>Rs.{b.gst.toLocaleString('en-IN')}</td>
-                        <td style={{ ...s.td, color: '#c9a84c', fontWeight: '700' }}>Rs.{b.total.toLocaleString('en-IN')}</td>
-                        <td style={s.td}><span style={{ background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50', padding: '3px 8px', borderRadius: '20px', fontSize: '10px' }}>Done</span></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </div>
         )}
-
         {activeTab === 'tracking' && (
           <div style={{ background: 'linear-gradient(135deg, #0f2040, #0a1628)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '12px', padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
@@ -692,16 +747,16 @@ alert(String.fromCodePoint(0x2705) + ' Payment Successful!\nRs.' + amt.toLocaleS
                 <table style={{ ...s.table, minWidth: '600px' }}>
                   <thead><tr>{['ID', 'Date', 'Machine', 'Type', 'Hrs', 'Base', 'GST', 'Total', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {BOOKING_HISTORY.map((b, i) => (
+                    {activeBookings.map((b, i) => (
                       <tr key={i} style={s.tr}>
-                        <td style={{ ...s.td, color: '#c9a84c', fontSize: '11px' }}>{b.id}</td>
-                        <td style={s.td}>{b.date}</td>
-                        <td style={s.td}><span style={s.machineTag}>{b.machine}</span></td>
-                        <td style={s.td}>{b.type}</td>
-                        <td style={s.td}>{b.hours}</td>
-                        <td style={s.td}>Rs.{b.baseAmt.toLocaleString('en-IN')}</td>
-                        <td style={s.td}>Rs.{b.gst.toLocaleString('en-IN')}</td>
-                        <td style={{ ...s.td, color: '#c9a84c', fontWeight: '700' }}>Rs.{b.total.toLocaleString('en-IN')}</td>
+                        <td style={{ ...s.td, color: '#c9a84c', fontSize: '11px' }}>{b.booking_ref || b.id}</td>
+                        <td style={s.td}>{b.date || (b.created_at ? new Date(b.created_at).toLocaleDateString('en-IN') : 'N/A')}</td>
+                        <td style={s.td}><span style={s.machineTag}>{b.machines ? b.machines.machine_id + ' - ' + b.machines.name : (b.machine || b.machine_id || 'N/A')}</span></td>
+                        <td style={s.td}>{b.type || b.booking_type}</td>
+                        <td style={s.td}>{b.hours || b.quantity}</td>
+                        <td style={s.td}>Rs.{(b.base_amount || b.baseAmt || 0).toLocaleString('en-IN')}</td>
+                        <td style={s.td}>Rs.{(b.gst_amount || b.gst || 0).toLocaleString('en-IN')}</td>
+                        <td style={{ ...s.td, color: '#c9a84c', fontWeight: '700' }}>Rs.{(b.total_amount || b.total || 0).toLocaleString('en-IN')}</td>
                         <td style={s.td}><span style={{ background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50', padding: '3px 8px', borderRadius: '20px', fontSize: '10px' }}>Done</span></td>
                       </tr>
                     ))}
@@ -764,8 +819,8 @@ alert(String.fromCodePoint(0x2705) + ' Payment Successful!\nRs.' + amt.toLocaleS
             <h3 style={{ ...s.modalTitle, color: '#e94560' }}>Cancel Booking?</h3>
             <div style={s.modalDetail}>
               <div style={s.modalRow}><span style={{ color: '#8896a8' }}>Machine</span><span style={{ color: '#c9a84c' }}>{cancelBooking.machine}</span></div>
-              <div style={s.modalRow}><span style={{ color: '#8896a8' }}>Penalty (1 hr)</span><span style={{ color: '#e94560', fontWeight: '700' }}>- Rs.{cancelBooking.ratePerHour.toLocaleString('en-IN')}</span></div>
-              <div style={{ ...s.modalRow, borderBottom: 'none' }}><span style={{ color: '#4CAF50', fontWeight: '700' }}>Wallet Credit</span><span style={{ color: '#4CAF50', fontWeight: '700', fontSize: '16px' }}>+ Rs.{(cancelBooking.advancePaid - cancelBooking.ratePerHour).toLocaleString('en-IN')}</span></div>
+              <div style={s.modalRow}><span style={{ color: '#8896a8' }}>Penalty (1 hr)</span><span style={{ color: '#e94560', fontWeight: '700' }}>- Rs.{(cancelBooking.ratePerHour || 0).toLocaleString('en-IN')}</span></div>
+              <div style={{ ...s.modalRow, borderBottom: 'none' }}><span style={{ color: '#4CAF50', fontWeight: '700' }}>Wallet Credit</span><span style={{ color: '#4CAF50', fontWeight: '700', fontSize: '16px' }}>+ Rs.{((cancelBooking.advancePaid || cancelBooking.advance_paid || 0) - (cancelBooking.ratePerHour || 0)).toLocaleString('en-IN')}</span></div>
             </div>
             <p style={{ color: '#e94560', fontSize: '11px', textAlign: 'center', margin: '10px 0 15px' }}>No Bank Refund — Wallet Credit Only</p>
             <div style={{ display: 'flex', gap: '10px' }}>
