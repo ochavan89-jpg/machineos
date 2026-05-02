@@ -9,7 +9,7 @@ import MobileNav from '../components/MobileNav';
 import BookingCalendar from '../components/BookingCalendar';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { sendBookingConfirmation } from '../emailService';
-import { sendBookingWhatsApp } from '../whatsappService';
+import { sendBookingWhatsApp, sendBookingNotifications, sendWalletNotification } from '../whatsappService';
 import { getMachines, createBooking, getWalletBalance, updateWalletBalance, addTransaction } from '../supabaseService';
 
 const MACHINES = [];
@@ -169,7 +169,14 @@ const ClientDashboard = () => {
       date: new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
     }]);
     sendBookingConfirmation('machineos@developmentexpress.in', { id: bookingRef, machine: selectedMachine.name, type: bookingType, advance: advanceAmt.toLocaleString('en-IN') });
-    sendBookingWhatsApp('+918408000084', { id: bookingRef, machine: selectedMachine.name, type: bookingType, advance: advanceAmt.toLocaleString('en-IN') });
+    await sendBookingNotifications({
+      booking: { id: bookingRef, type: bookingType, location: selectedMachine.location, advance: advanceAmt, total: Math.round(totalCost * 1.18) },
+      client: { name: user.name, phone: user.phone },
+      machine: { name: selectedMachine.name },
+      operator: { phone: '+919765432100' },
+      owner: { name: 'Rajesh Patil', phone: '+919876543210' },
+    });
+    await sendWalletNotification({ phone: user.phone || '+919766926636', name: user.name || 'Client', type: 'debit', amount: advanceAmt, balance: walletBalance - advanceAmt, ref: bookingRef });
     setShowPayment(false);
     setActiveTab('mybookings');
   };
