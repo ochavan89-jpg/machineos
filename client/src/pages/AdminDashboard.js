@@ -11,13 +11,87 @@ import { getMachines, getAllBookings, getAllUsers, getAllTransactions, getAllIss
 const NAV = [
   { id: 'overview', icon: String.fromCodePoint(0x1F4CA), label: 'Overview' },
   { id: 'machines', icon: String.fromCodePoint(0x1F69C), label: 'Machines' },
+  { id: 'bookings', icon: String.fromCodePoint(0x1F4CB), label: 'Bookings' },
   { id: 'clients', icon: String.fromCodePoint(0x1F477), label: 'Clients' },
-  { id: 'owners', icon: String.fromCodePoint(0x1F3D7), label: 'Owners' },
   { id: 'operators', icon: String.fromCodePoint(0x1F527), label: 'Operators' },
   { id: 'wallet', icon: String.fromCodePoint(0x1F4B3), label: 'Wallet & Billing' },
   { id: 'approvals', icon: String.fromCodePoint(0x23F3), label: 'Approvals' },
   { id: 'reports', icon: String.fromCodePoint(0x1F4C8), label: 'Reports' },
 ];
+
+const MonthAccordion = ({ month, days, userData, s, isSmall }) => {
+  const [open, setOpen] = React.useState(false);
+  const [openDay, setOpenDay] = React.useState(null);
+  const total = Object.values(days).flat().length;
+  return (
+    <div style={{ marginBottom: '12px', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '12px', overflow: 'hidden' }}>
+      <div onClick={() => setOpen(!open)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 18px', background: 'linear-gradient(135deg, #0f2040, #0a1628)', cursor: 'pointer' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '18px' }}>{String.fromCodePoint(0x1F4C5)}</span>
+          <span style={{ color: '#c9a84c', fontWeight: '700', fontSize: '15px' }}>{month}</span>
+          <span style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.3)', color: '#c9a84c', padding: '2px 10px', borderRadius: '20px', fontSize: '11px' }}>{total} bookings</span>
+        </div>
+        <span style={{ color: '#c9a84c', fontSize: '18px' }}>{open ? String.fromCodePoint(0x25B2) : String.fromCodePoint(0x25BC)}</span>
+      </div>
+      {open && (
+        <div style={{ padding: '10px' }}>
+          {Object.entries(days).map(([day, bookings]) => (
+            <div key={day} style={{ marginBottom: '8px', border: '1px solid rgba(201,168,76,0.1)', borderRadius: '10px', overflow: 'hidden' }}>
+              <div onClick={() => setOpenDay(openDay === day ? null : day)} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(201,168,76,0.05)', cursor: 'pointer' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ color: '#8896a8', fontSize: '12px' }}>{String.fromCodePoint(0x1F4C6)} {day}</span>
+                  <span style={{ background: 'rgba(76,175,80,0.1)', border: '1px solid rgba(76,175,80,0.3)', color: '#4CAF50', padding: '1px 8px', borderRadius: '20px', fontSize: '10px' }}>{bookings.length} bookings</span>
+                </div>
+                <span style={{ color: '#c9a84c', fontSize: '14px' }}>{openDay === day ? String.fromCodePoint(0x25B2) : String.fromCodePoint(0x25BC)}</span>
+              </div>
+              {openDay === day && (
+                <div style={{ padding: '8px' }}>
+                  {bookings.map((b, i) => {
+                    const client = userData.find(u => u.id === b.client_id);
+                    const t = new Date(b.created_at);
+                    return (
+                      <div key={i} style={{ background: 'linear-gradient(135deg, #0a1628, #060e1c)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: '10px', padding: '14px', marginBottom: '8px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                          <div>
+                            <span style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', color: '#c9a84c', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>{b.booking_ref}</span>
+                            <span style={{ marginLeft: '8px', color: '#8896a8', fontSize: '11px' }}>{t.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                          <span style={{ background: b.status === 'Active' ? 'rgba(76,175,80,0.15)' : 'rgba(255,152,0,0.15)', border: b.status === 'Active' ? '1px solid #4CAF50' : '1px solid #FF9800', color: b.status === 'Active' ? '#4CAF50' : '#FF9800', padding: '3px 10px', borderRadius: '20px', fontSize: '11px' }}>{b.status}</span>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: isSmall ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: '8px' }}>
+                          {[
+                            { label: 'Client', val: client ? client.name : 'Unknown', icon: String.fromCodePoint(0x1F477) },
+                            { label: 'Machine', val: b.machine_id || 'N/A', icon: String.fromCodePoint(0x1F69C) },
+                            { label: 'Type', val: b.booking_type, icon: String.fromCodePoint(0x1F4CB) },
+                            { label: 'Location', val: b.location || 'N/A', icon: String.fromCodePoint(0x1F4CD) },
+                            { label: 'Base Amount', val: 'Rs.' + (b.base_amount || 0).toLocaleString('en-IN'), icon: String.fromCodePoint(0x1F4B0) },
+                            { label: 'Advance Paid', val: 'Rs.' + (b.advance_paid || 0).toLocaleString('en-IN'), icon: String.fromCodePoint(0x2705) },
+                            { label: 'Quantity', val: b.quantity + (b.booking_type === 'hourly' ? ' hrs' : b.booking_type === 'daily' ? ' days' : b.booking_type === 'weekly' ? ' weeks' : ' months'), icon: String.fromCodePoint(0x23F1) },
+                            { label: 'Start Date', val: b.start_date ? new Date(b.start_date).toLocaleDateString('en-IN') : 'N/A', icon: String.fromCodePoint(0x1F4C5) },
+                          ].map((d, j) => (
+                            <div key={j} style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px 10px' }}>
+                              <p style={{ color: '#8896a8', fontSize: '9px', margin: '0 0 3px', letterSpacing: '0.5px' }}>{d.icon} {d.label}</p>
+                              <p style={{ color: '#e8e0d0', fontSize: '12px', fontWeight: '600', margin: 0 }}>{d.val}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ marginTop: '10px', padding: '8px 10px', background: b.owner_approved ? 'rgba(76,175,80,0.08)' : 'rgba(255,152,0,0.08)', border: b.owner_approved ? '1px solid rgba(76,175,80,0.3)' : '1px solid rgba(255,152,0,0.3)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ color: b.owner_approved ? '#4CAF50' : '#FF9800', fontSize: '11px', fontWeight: '600' }}>{b.owner_approved ? String.fromCodePoint(0x2705) + ' Owner Approved - Machine Dispatched' : String.fromCodePoint(0x23F3) + ' Awaiting Owner Approval'}</span>
+                          {b.owner_approved && b.owner_approved_at && <span style={{ color: '#8896a8', fontSize: '10px' }}>{new Date(b.owner_approved_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -284,6 +358,37 @@ const AdminDashboard = () => {
           </div>
         )}
 
+                {/* BOOKINGS TAB */}
+        {!loading && activeTab === 'bookings' && (
+          <div>
+            {/* Stats */}
+            <div style={{ ...s.cardRow, gridTemplateColumns: isSmall ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', marginBottom: '20px' }}>
+              {[
+                { icon: String.fromCodePoint(0x1F4CB), val: bookingData.length.toString(), label: 'Total Bookings' },
+                { icon: String.fromCodePoint(0x2705), val: activeBookings.length.toString(), label: 'Active Now' },
+                { icon: String.fromCodePoint(0x1F4B0), val: 'Rs.' + totalRevenue.toLocaleString('en-IN'), label: 'Total Revenue' },
+                { icon: String.fromCodePoint(0x1F4C5), val: bookingData.filter(b => b.start_date === new Date().toISOString().split('T')[0]).length.toString(), label: 'Today' },
+              ].map((c, i) => (
+                <div key={i} style={s.card}><p style={s.cardIcon}>{c.icon}</p><h2 style={s.cardNumber}>{c.val}</h2><p style={s.cardLabel}>{c.label}</p></div>
+              ))}
+            </div>
+            {/* Group by Month */}
+            {(() => {
+              const grouped = {};
+              bookingData.forEach(b => {
+                const d = new Date(b.created_at || b.start_date);
+                const key = d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+                const day = d.toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'short' });
+                if (!grouped[key]) grouped[key] = {};
+                if (!grouped[key][day]) grouped[key][day] = [];
+                grouped[key][day].push(b);
+              });
+              return Object.entries(grouped).map(([month, days]) => (
+                <MonthAccordion key={month} month={month} days={days} userData={userData} s={s} isSmall={isSmall} />
+              ));
+            })()}
+          </div>
+        )}
         {/* CLIENTS TAB */}
         {!loading && activeTab === 'clients' && (
           <div>
