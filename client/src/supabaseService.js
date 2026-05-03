@@ -103,12 +103,12 @@ export const getAllUsers = async () => {
     .select('*')
     .order('created_at', { ascending: false });
   if (error) { console.error(error); return []; }
-  return data;
+  const users = data || [];
+  const { data: wallets } = await supabase.from('wallets').select('user_id, balance');
+  return users.map(u => ({ ...u, wallet_balance: (wallets || []).find(w => w.user_id === u.id)?.balance || 0 }));
 };
-
 export const getAllClients = async () => {
   const { data, error } = await supabase
-    .from('users')
     .select('*')
     .eq('role', 'client');
   if (error) { console.error(error); return []; }
