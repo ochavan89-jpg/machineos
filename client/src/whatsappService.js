@@ -1,14 +1,13 @@
-const SUPABASE_URL = 'https://xoqolkqsdkfwxveuwlow.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhvcW9sa3FzZGtmd3h2ZXV3bG93Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYwNTk5NDUsImV4cCI6MjA5MTYzNTk0NX0.F2VkwQT0l7GdIsqc5QiwO92HtB3sFqrQNgIfvWBQBwM';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
 
 export const sendWhatsApp = async (to, message) => {
   try {
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/send_whatsapp`, {
+    const token = localStorage.getItem('machineos_token');
+    const res = await fetch(`${API_BASE_URL}/api/notifications/whatsapp`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
-        'apikey': SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${token || ''}`,
       },
       body: JSON.stringify({ to, message }),
     });

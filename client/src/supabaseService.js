@@ -180,49 +180,74 @@ export const getAllOperators = async () => {
 
 // ─── FUEL LOGS ───
 export const addFuelLog = async (log) => {
-  const { error } = await supabase
-    .from('fuel_logs')
-    .insert([log]);
-  if (error) { console.error(error); return false; }
-  return true;
+  try {
+    await secureFetch('/api/operator/fuel-log', {
+      method: 'POST',
+      body: JSON.stringify({
+        fuelLevel: Number(log.fuel_level),
+        note: log.note,
+      }),
+    });
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
 };
 
 export const getFuelLogs = async (machineId) => {
-  const { data, error } = await supabase
-    .from('fuel_logs')
-    .select('*')
-    .eq('machine_id', machineId)
-    .order('created_at', { ascending: false });
-  if (error) { console.error(error); return []; }
-  return data;
+  try {
+    const result = await secureFetch('/api/operator/fuel-logs');
+    return result.items || [];
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 };
 
 // ─── ATTENDANCE ───
 export const markAttendance = async (attendance) => {
-  const { error } = await supabase
-    .from('attendance')
-    .insert([attendance]);
-  if (error) { console.error(error); return false; }
-  return true;
+  try {
+    await secureFetch('/api/operator/attendance', {
+      method: 'POST',
+      body: JSON.stringify({
+        status: attendance.status,
+        checkIn: attendance.check_in,
+        date: attendance.date,
+      }),
+    });
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
 };
 
 export const getAttendanceByOperator = async (operatorId) => {
-  const { data, error } = await supabase
-    .from('attendance')
-    .select('*')
-    .eq('operator_id', operatorId)
-    .order('date', { ascending: false });
-  if (error) { console.error(error); return []; }
-  return data;
+  try {
+    const result = await secureFetch('/api/operator/attendance');
+    return result.items || [];
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 };
 
 // ─── ISSUES ───
 export const reportIssue = async (issue) => {
-  const { error } = await supabase
-    .from('issues')
-    .insert([issue]);
-  if (error) { console.error(error); return false; }
-  return true;
+  try {
+    await secureFetch('/api/operator/issues', {
+      method: 'POST',
+      body: JSON.stringify({
+        issueType: issue.issue_type,
+        description: issue.description,
+      }),
+    });
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
 };
 
 export const getAllIssues = async () => {
@@ -300,6 +325,100 @@ export const approveBooking = async (bookingId) => {
   } catch (error) {
     console.error(error);
     return false;
+  }
+};
+
+export const getDlqItems = async (filters = {}) => {
+  try {
+    const params = new URLSearchParams();
+    if (filters.queue) params.set('queue', filters.queue);
+    if (filters.status) params.set('status', filters.status);
+    if (filters.cursor) params.set('cursor', filters.cursor);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    const query = params.toString();
+    const result = await secureFetch(`/api/admin/dlq${query ? `?${query}` : ''}`);
+    return {
+      items: result.items || [],
+      counters: result.counters || {},
+      nextCursor: result.nextCursor || null,
+      hasMore: Boolean(result.hasMore),
+      error: '',
+    };
+  } catch (error) {
+    console.error(error);
+    return { items: [], counters: {}, nextCursor: null, hasMore: false, error: error?.message || 'Failed to fetch DLQ items' };
+  }
+};
+
+export const retryDlqItem = async (id, reason = '') => {
+  try {
+    await secureFetch(`/api/admin/dlq/${id}/retry`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
+};
+
+export const getDlqStats = async () => {
+  try {
+    return await secureFetch('/api/admin/dlq/stats');
+  } catch (error) {
+    console.error(error);
+    return { totalLast24h: 0, failedLast24h: 0, retriedLast24h: 0, queueCounts: {}, hourly: [] };
+  }
+};
+
+export const getRateLimitTelemetry = async () => {
+  try {
+    return await secureFetch('/api/admin/telemetry/rate-limit');
+  } catch (error) {
+    console.error(error);
+    return { allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0, error: error?.message || 'Failed to fetch telemetry' };
+  }
+};
+
+export const acknowledgeSecuritySignal = async (signalId) => {
+  try {
+    const result = await secureFetch(`/api/admin/security-signals/${signalId}/ack`, { method: 'POST' });
+    return {
+      ok: true,
+      alreadyAcknowledged: Boolean(result?.alreadyAcknowledged),
+      acknowledgedBy: result?.acknowledgedBy || null,
+      acknowledgedAt: result?.acknowledgedAt || null,
+    };
+  } catch (error) {
+    console.error(error);
+    return { ok: false, alreadyAcknowledged: false, acknowledgedBy: null, acknowledgedAt: null };
+  }
+};
+
+export const getAuditLogs = async (filters = {}) => {
+  try {
+    const params = new URLSearchParams();
+    if (filters.action) params.set('action', filters.action);
+    if (filters.actorId) params.set('actorId', filters.actorId);
+    if (filters.actorRole) params.set('actorRole', filters.actorRole);
+    if (filters.entityType) params.set('entityType', filters.entityType);
+    if (filters.metadata) params.set('metadata', filters.metadata);
+    if (filters.from) params.set('from', filters.from);
+    if (filters.to) params.set('to', filters.to);
+    if (filters.cursor) params.set('cursor', filters.cursor);
+    if (filters.limit) params.set('limit', String(filters.limit));
+    const query = params.toString();
+    const result = await secureFetch(`/api/admin/audit-logs${query ? `?${query}` : ''}`);
+    return {
+      items: result.items || [],
+      nextCursor: result.nextCursor || null,
+      hasMore: Boolean(result.hasMore),
+      error: '',
+    };
+  } catch (error) {
+    console.error(error);
+    return { items: [], nextCursor: null, hasMore: false, error: error?.message || 'Failed to fetch audit logs' };
   }
 };
 

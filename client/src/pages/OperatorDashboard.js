@@ -3,9 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import useSessionTimeout from '../hooks/useSessionTimeout';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageSelector from '../components/LanguageSelector';
-import { sendIssueAlert } from '../emailService';
 import { useWindowSize } from '../hooks/useWindowSize';
-import { markAttendance, addFuelLog, reportIssue } from '../supabaseService';
+import { markAttendance, addFuelLog, reportIssue, getAttendanceByOperator, getFuelLogs } from '../supabaseService';
 
 const OPERATOR = {
   name: 'Ramesh Kadam',
@@ -83,10 +82,43 @@ const OperatorDashboard = () => {
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [issueType, setIssueType] = useState('');
   const [issueNote, setIssueNote] = useState('');
+  const [attendanceRows, setAttendanceRows] = useState(attendanceHistory);
+  const [fuelRows, setFuelRows] = useState(fuelHistory);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const user = JSON.parse(localStorage.getItem('machineos_user') || '{}');
+    if (!user?.id) return;
+
+    getAttendanceByOperator(user.id).then((rows) => {
+      if (rows && rows.length > 0) {
+        setAttendanceRows(rows.map((r) => ({
+          date: r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '-',
+          day: r.date ? new Date(r.date).toLocaleDateString('en-IN', { weekday: 'long' }) : '-',
+          status: r.status === 'present' ? 'Present' : r.status === 'halfday' ? 'Half Day' : 'Absent',
+          checkIn: r.check_in || '-',
+          checkOut: r.check_out || '-',
+          hmr: r.hmr || 0,
+        })));
+      }
+    });
+
+    getFuelLogs(user.id).then((rows) => {
+      if (rows && rows.length > 0) {
+        setFuelRows(rows.map((r) => ({
+          date: r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '-',
+          time: r.created_at ? new Date(r.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '-',
+          level: r.fuel_level || 0,
+          change: 0,
+          note: r.note || 'Fuel update',
+          by: 'Operator',
+        })));
+      }
+    });
   }, []);
 
   const handleAttendance = async (type) => {
@@ -123,7 +155,6 @@ const OperatorDashboard = () => {
     const now = new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
     setLogs(prev => [{ type: 'issue', time: now, note: '[' + issueType + '] ' + issueNote, fuel: fuelLevel }, ...prev]);
     if (user?.id) await reportIssue({ operator_id: user.id, issue_type: issueType, description: issueNote, status: 'Pending', created_at: new Date().toISOString() });
-    sendIssueAlert('machineos@developmentexpress.in', { machine: OPERATOR.machineId, type: issueType, description: issueNote, operator: OPERATOR.name });
     setIssueType(''); setIssueNote(''); setShowIssueModal(false);
     alert('Issue reported successfully!');
   };
@@ -429,7 +460,7 @@ const OperatorDashboard = () => {
                 <table style={s.table}>
                   <thead><tr>{['Date', 'Status', 'In', 'Out', 'HMR'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {attendanceHistory.map((a, i) => (
+                    {attendanceRows.map((a, i) => (
                       <tr key={i} style={s.tr}>
                         <td style={s.td}><p style={{ margin: 0, fontWeight: '600' }}>{a.date}</p><p style={{ margin: 0, color: '#556070', fontSize: '10px' }}>{a.day}</p></td>
                         <td style={s.td}><span style={{ color: a.status === 'Present' ? '#4CAF50' : '#FF9800', fontWeight: '700' }}>{a.status === 'Present' ? String.fromCodePoint(0x2705) : String.fromCodePoint(0x1F550)} {a.status}</span></td>
@@ -530,7 +561,7 @@ const OperatorDashboard = () => {
                 <table style={s.table}>
                   <thead><tr>{['Date', 'Time', 'Level', 'Change', 'Note'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
                   <tbody>
-                    {fuelHistory.map((f, i) => (
+                    {fuelRows.map((f, i) => (
                       <tr key={i} style={s.tr}>
                         <td style={s.td}>{f.date}</td>
                         <td style={s.td}>{f.time}</td>

@@ -1,4 +1,5 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿/* eslint-disable unicode-bom */
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSessionTimeout from '../hooks/useSessionTimeout';
 import { useLanguage } from '../context/LanguageContext';
@@ -6,7 +7,7 @@ import LanguageSelector from '../components/LanguageSelector';
 import { generateInternalLedger } from '../services/pdfGenerator';
 import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
-import { getMachines, getAllBookings, getAllUsers, getAllTransactions, getAllIssues, getPendingUsers, approveUser, rejectUser } from '../supabaseService';
+import { getMachines, getAllBookings, getAllUsers, getAllTransactions, getAllIssues, getPendingUsers, approveUser, rejectUser, getDlqItems, retryDlqItem, getDlqStats, getAuditLogs, getRateLimitTelemetry, acknowledgeSecuritySignal } from '../supabaseService';
 
 const NAV = [
   { id: 'overview', icon: String.fromCodePoint(0x1F4CA), label: 'Overview' },
@@ -16,6 +17,8 @@ const NAV = [
   { id: 'operators', icon: String.fromCodePoint(0x1F527), label: 'Operators' },
   { id: 'wallet', icon: String.fromCodePoint(0x1F4B3), label: 'Wallet & Billing' },
   { id: 'approvals', icon: String.fromCodePoint(0x23F3), label: 'Approvals' },
+  { id: 'dlq', icon: String.fromCodePoint(0x1F9EF), label: 'DLQ Monitor' },
+  { id: 'audit', icon: String.fromCodePoint(0x1F4DC), label: 'Audit Logs' },
   { id: 'reports', icon: String.fromCodePoint(0x1F4C8), label: 'Reports' },
 ];
 
@@ -105,31 +108,269 @@ const AdminDashboard = () => {
   const [userData, setUserData] = useState([]);
   const [transactionData, setTransactionData] = useState([]);
   const [issueData, setIssueData] = useState([]);
+  const [dlqData, setDlqData] = useState([]);
+  const [dlqCounters, setDlqCounters] = useState({});
+  const [dlqQueueFilter, setDlqQueueFilter] = useState('');
+  const [dlqStatusFilter, setDlqStatusFilter] = useState('');
+  const [dlqCursor, setDlqCursor] = useState(null);
+  const [dlqHasMore, setDlqHasMore] = useState(false);
+  const [dlqLoadingMore, setDlqLoadingMore] = useState(false);
+  const [dlqStats, setDlqStats] = useState({ totalLast24h: 0, failedLast24h: 0, retriedLast24h: 0, queueCounts: {}, hourly: [] });
+  const [dlqMessage, setDlqMessage] = useState('');
+  const [auditMessage, setAuditMessage] = useState('');
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [auditActionFilter, setAuditActionFilter] = useState('');
+  const [auditActorFilter, setAuditActorFilter] = useState('');
+  const [auditRoleFilter, setAuditRoleFilter] = useState('');
+  const [auditEntityFilter, setAuditEntityFilter] = useState('');
+  const [auditFrom, setAuditFrom] = useState('');
+  const [auditTo, setAuditTo] = useState('');
+  const [auditMetaFilter, setAuditMetaFilter] = useState('');
+  const [auditCursor, setAuditCursor] = useState(null);
+  const [auditHasMore, setAuditHasMore] = useState(false);
+  const [auditLoadingMore, setAuditLoadingMore] = useState(false);
+  const [selectedDlqItem, setSelectedDlqItem] = useState(null);
+  const [dlqRetryReason, setDlqRetryReason] = useState('');
+  const [expandedAuditRows, setExpandedAuditRows] = useState({});
+  const [csvColumns, setCsvColumns] = useState({
+    created_at: true,
+    action: true,
+    actor_id: true,
+    actor_role: true,
+    entity_type: true,
+    entity_id: true,
+  });
   const [loading, setLoading] = useState(true);
   const [pendingUsers, setPendingUsers] = useState([]);
+  const [rateTelemetry, setRateTelemetry] = useState({ allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0 });
+  const [securitySignals, setSecuritySignals] = useState([]);
+  const [securityRefreshing, setSecurityRefreshing] = useState(false);
+  const [securitySeverityFilter, setSecuritySeverityFilter] = useState('ALL');
+  const [acknowledgedSignalIds, setAcknowledgedSignalIds] = useState({});
+  const [securityLastRefreshedAt, setSecurityLastRefreshedAt] = useState(null);
+  const [securityNow, setSecurityNow] = useState(Date.now());
+  const [securityPanelMessage, setSecurityPanelMessage] = useState('');
+  const getCurrentAdminId = () => {
+    try {
+      const user = JSON.parse(localStorage.getItem('machineos_user') || '{}');
+      return user?.id || user?.email || 'current_admin';
+    } catch (_err) {
+      return 'current_admin';
+    }
+  };
+  const waitMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const fetchSecurityDataWithRetry = useCallback(async (maxAttempts = 3) => {
+    let telemetry = null;
+    let secLogs = null;
+    let ackLogs = null;
+    let lastError = '';
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      telemetry = await getRateLimitTelemetry();
+      secLogs = await getAuditLogs({ action: 'security.admin_', limit: 12 });
+      ackLogs = await getAuditLogs({ action: 'security.signal_acknowledged', limit: 100 });
+      const hasError = telemetry?.error || secLogs?.error || ackLogs?.error;
+      if (!hasError) {
+        return { telemetry, secLogs, ackLogs, error: '' };
+      }
+      lastError = telemetry?.error || secLogs?.error || ackLogs?.error || 'security panel fetch failed';
+      if (attempt < maxAttempts) {
+        await waitMs(250 * (2 ** (attempt - 1)));
+      }
+    }
+    return { telemetry, secLogs, ackLogs, error: lastError };
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
-      const [machines, bookings, users, transactions, issues] = await Promise.all([
+      const [machines, bookings, users, transactions, issues, dlq] = await Promise.all([
         getMachines(),
         getAllBookings(),
         getAllUsers(),
         getAllTransactions(),
-        getAllIssues()
+        getAllIssues(),
+        getDlqItems({ limit: 100 }),
       ]);
       setMachineData(machines);
       setBookingData(bookings);
       setUserData(users);
       setTransactionData(transactions);
       setIssueData(issues);
+      setDlqData(dlq.items || []);
+      setDlqCounters(dlq.counters || {});
+      setDlqCursor(dlq.nextCursor || null);
+      setDlqHasMore(Boolean(dlq.hasMore));
+      setDlqStats(await getDlqStats());
+      const securityData = await fetchSecurityDataWithRetry(3);
+      setRateTelemetry(securityData.telemetry || { allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0 });
+      setSecuritySignals(securityData.secLogs?.items || []);
+      const ackMap = {};
+      (securityData.ackLogs?.items || []).forEach((x) => {
+        const sid = x?.metadata?.signalId;
+        if (sid) {
+          ackMap[sid] = {
+            acknowledged: true,
+            actorId: x.actor_id || '-',
+            acknowledgedAt: x.created_at || null,
+          };
+        }
+      });
+      setAcknowledgedSignalIds(ackMap);
+      setSecurityLastRefreshedAt(new Date().toISOString());
+      setSecurityPanelMessage(securityData.error ? `Security panel retry exhausted: ${securityData.error.slice(0, 120)}` : '');
       setLoading(false);
       const pending = await getPendingUsers();
       setPendingUsers(pending);
     };
     loadData();
+  }, [fetchSecurityDataWithRetry]);
+  const refreshSecurityPanel = useCallback(async () => {
+    setSecurityRefreshing(true);
+    const securityData = await fetchSecurityDataWithRetry(3);
+    setRateTelemetry(securityData.telemetry || { allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0 });
+    setSecuritySignals(securityData.secLogs?.items || []);
+    const ackMap = {};
+    (securityData.ackLogs?.items || []).forEach((x) => {
+      const sid = x?.metadata?.signalId;
+      if (sid) {
+        ackMap[sid] = {
+          acknowledged: true,
+          actorId: x.actor_id || '-',
+          acknowledgedAt: x.created_at || null,
+        };
+      }
+    });
+    setAcknowledgedSignalIds(ackMap);
+    setSecurityLastRefreshedAt(new Date().toISOString());
+    setSecurityPanelMessage(securityData.error ? `Security panel retry exhausted: ${securityData.error.slice(0, 120)}` : '');
+    setSecurityRefreshing(false);
+  }, [fetchSecurityDataWithRetry]);
+  useEffect(() => {
+    if (loading) return;
+    const timer = setInterval(() => {
+      refreshSecurityPanel();
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [loading, refreshSecurityPanel]);
+  useEffect(() => {
+    const timer = setInterval(() => setSecurityNow(Date.now()), 10000);
+    return () => clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    if (loading || activeTab !== 'dlq') return;
+    Promise.all([
+      getDlqItems({ queue: dlqQueueFilter, status: dlqStatusFilter, limit: 100 }),
+      getDlqStats(),
+    ]).then(([data, stats]) => {
+      setDlqData(data.items || []);
+      setDlqCounters(data.counters || {});
+      setDlqCursor(data.nextCursor || null);
+      setDlqHasMore(Boolean(data.hasMore));
+      setDlqStats(stats);
+      if (data.error) {
+        setDlqMessage(`DLQ fetch error: ${data.error.slice(0, 120)}`);
+      } else {
+        setDlqMessage('');
+      }
+    });
+  }, [activeTab, dlqQueueFilter, dlqStatusFilter, loading]);
+  const loadMoreDlq = async () => {
+    if (!dlqHasMore || !dlqCursor || dlqLoadingMore) return;
+    setDlqLoadingMore(true);
+    const result = await getDlqItems({
+      queue: dlqQueueFilter,
+      status: dlqStatusFilter,
+      cursor: dlqCursor,
+      limit: 100,
+    });
+    setDlqData((prev) => [...prev, ...(result.items || [])]);
+    setDlqCursor(result.nextCursor || null);
+    setDlqHasMore(Boolean(result.hasMore));
+    setDlqLoadingMore(false);
+  };
+
+  useEffect(() => {
+    if (loading || activeTab !== 'audit') return;
+    const fromIso = auditFrom ? new Date(auditFrom).toISOString() : '';
+    const toIso = auditTo ? new Date(auditTo).toISOString() : '';
+    setExpandedAuditRows({});
+    getAuditLogs({
+      action: auditActionFilter,
+      actorId: auditActorFilter,
+      actorRole: auditRoleFilter,
+      entityType: auditEntityFilter,
+      metadata: auditMetaFilter,
+      from: fromIso,
+      to: toIso,
+      limit: 120,
+    }).then((result) => {
+      setAuditLogs(result.items || []);
+      setAuditCursor(result.nextCursor || null);
+      setAuditHasMore(Boolean(result.hasMore));
+      if (result.error) {
+        setAuditMessage(`Audit fetch error: ${result.error.slice(0, 120)}`);
+      } else {
+        setAuditMessage('');
+      }
+    });
+  }, [activeTab, auditActionFilter, auditActorFilter, auditRoleFilter, auditEntityFilter, auditMetaFilter, auditFrom, auditTo, loading]);
+
+  const setAuditPreset = (preset) => {
+    const now = new Date();
+    if (preset === 'today') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      setAuditFrom(start.toISOString().slice(0, 16));
+      setAuditTo(now.toISOString().slice(0, 16));
+    } else if (preset === '24h') {
+      setAuditFrom(new Date(Date.now() - (24 * 60 * 60 * 1000)).toISOString().slice(0, 16));
+      setAuditTo(now.toISOString().slice(0, 16));
+    } else if (preset === '7d') {
+      setAuditFrom(new Date(Date.now() - (7 * 24 * 60 * 60 * 1000)).toISOString().slice(0, 16));
+      setAuditTo(now.toISOString().slice(0, 16));
+    } else {
+      setAuditFrom('');
+      setAuditTo('');
+    }
+  };
+
+  const exportAuditCsv = () => {
+    if (visibleAuditLogs.length === 0) return;
+    const header = Object.entries(csvColumns).filter(([, enabled]) => enabled).map(([key]) => key);
+    if (header.length === 0) return;
+    const rows = visibleAuditLogs.map((r) => header.map((key) => r[key])
+      .map((v) => `"${String(v || '').replace(/"/g, '""')}"`)
+      .join(','));
+    const csv = [header.join(','), ...rows].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const handleLogout = () => navigate('/');
+  const clearAuditField = (field) => {
+    if (field === 'action') setAuditActionFilter('');
+    if (field === 'actor') setAuditActorFilter('');
+    if (field === 'role') setAuditRoleFilter('');
+    if (field === 'entity') setAuditEntityFilter('');
+    if (field === 'meta') setAuditMetaFilter('');
+    if (field === 'from') setAuditFrom('');
+    if (field === 'to') setAuditTo('');
+  };
+  const clearAllAuditFilters = () => {
+    setAuditActionFilter('');
+    setAuditActorFilter('');
+    setAuditRoleFilter('');
+    setAuditEntityFilter('');
+    setAuditMetaFilter('');
+    setAuditFrom('');
+    setAuditTo('');
+  };
 
   // Derived data from Supabase
   const clientUsers = userData.filter(u => u.role === 'client');
@@ -139,6 +380,92 @@ const AdminDashboard = () => {
   const totalRevenue = bookingData.reduce((a, b) => a + (b.base_amount || 0), 0);
   const commission = Math.round(totalRevenue * 0.15);
   const lowFuelMachines = machineData.filter(m => (m.fuel_level || 0) < 30);
+  const visibleAuditLogs = auditLogs;
+  const expandedAuditCount = Object.values(expandedAuditRows).filter(Boolean).length;
+  const auditVirtual = useMemo(() => {
+    const rowHeight = 44;
+    const viewportHeight = 430;
+    const overscan = 8;
+    const total = visibleAuditLogs.length;
+    if (expandedAuditCount > 0) {
+      return {
+        useVirtual: false,
+        topPad: 0,
+        bottomPad: 0,
+        items: visibleAuditLogs,
+        viewportHeight,
+      };
+    }
+    const useVirtual = total > 120;
+    if (!useVirtual) {
+      return {
+        useVirtual: false,
+        topPad: 0,
+        bottomPad: 0,
+        items: visibleAuditLogs,
+        viewportHeight,
+      };
+    }
+    const scrollTop = 0;
+    const start = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
+    const visibleCount = Math.ceil(viewportHeight / rowHeight) + (overscan * 2);
+    const end = Math.min(total, start + visibleCount);
+    return {
+      useVirtual: true,
+      topPad: start * rowHeight,
+      bottomPad: Math.max(0, (total - end) * rowHeight),
+      items: visibleAuditLogs.slice(start, end),
+      viewportHeight,
+      rowHeight,
+    };
+  }, [visibleAuditLogs, expandedAuditCount]);
+  const [auditScrollTop, setAuditScrollTop] = useState(0);
+  useEffect(() => {
+    setAuditScrollTop(0);
+  }, [activeTab, auditActionFilter, auditActorFilter, auditRoleFilter, auditEntityFilter, auditFrom, auditTo, auditMetaFilter]);
+  const auditVirtualWindow = useMemo(() => {
+    if (!auditVirtual.useVirtual) return auditVirtual;
+    const overscan = 8;
+    const total = visibleAuditLogs.length;
+    const start = Math.max(0, Math.floor(auditScrollTop / auditVirtual.rowHeight) - overscan);
+    const visibleCount = Math.ceil(auditVirtual.viewportHeight / auditVirtual.rowHeight) + (overscan * 2);
+    const end = Math.min(total, start + visibleCount);
+    return {
+      ...auditVirtual,
+      topPad: start * auditVirtual.rowHeight,
+      bottomPad: Math.max(0, (total - end) * auditVirtual.rowHeight),
+      items: visibleAuditLogs.slice(start, end),
+    };
+  }, [auditVirtual, auditScrollTop, visibleAuditLogs]);
+  const loadMoreAuditLogs = async () => {
+    if (!auditHasMore || !auditCursor || auditLoadingMore) return;
+    const fromIso = auditFrom ? new Date(auditFrom).toISOString() : '';
+    const toIso = auditTo ? new Date(auditTo).toISOString() : '';
+    setAuditLoadingMore(true);
+    const result = await getAuditLogs({
+      action: auditActionFilter,
+      actorId: auditActorFilter,
+      actorRole: auditRoleFilter,
+      entityType: auditEntityFilter,
+      metadata: auditMetaFilter,
+      from: fromIso,
+      to: toIso,
+      cursor: auditCursor,
+      limit: 120,
+    });
+    setAuditLogs((prev) => [...prev, ...(result.items || [])]);
+    setAuditCursor(result.nextCursor || null);
+    setAuditHasMore(Boolean(result.hasMore));
+    if (result.error) {
+      setAuditMessage(`Audit fetch error: ${result.error.slice(0, 120)}`);
+    } else if (!result.items || result.items.length === 0) {
+      setAuditMessage('No more audit logs found for current filters.');
+      setTimeout(() => setAuditMessage(''), 2500);
+    } else {
+      setAuditMessage('');
+    }
+    setAuditLoadingMore(false);
+  };
 
   
 
@@ -164,6 +491,47 @@ const AdminDashboard = () => {
     ...issueData.slice(0, 3).map(issue => ({ icon: '⚠️', msg: `Issue: ${issue.issue_type || 'Unknown'} - ${issue.status}`, time: 'Recent', color: '#FF9800' })),
     { icon: '✅', msg: 'System Running Normally', time: 'Live', color: '#4CAF50' },
   ];
+  const visibleSecuritySignals = securitySignals.filter((row) => {
+    if (securitySeverityFilter === 'ALL') return true;
+    const severity = row?.metadata?.severity || (row.action?.includes('retry_burst') ? 'HIGH' : 'MEDIUM');
+    return severity === securitySeverityFilter;
+  });
+  const highCount = visibleSecuritySignals.filter((x) => (x?.metadata?.severity || (x.action?.includes('retry_burst') ? 'HIGH' : 'MEDIUM')) === 'HIGH').length;
+  const mediumCount = visibleSecuritySignals.filter((x) => (x?.metadata?.severity || (x.action?.includes('retry_burst') ? 'HIGH' : 'MEDIUM')) === 'MEDIUM').length;
+  const severityMax = Math.max(1, highCount, mediumCount);
+  const isSecurityStale = securityLastRefreshedAt ? (securityNow - new Date(securityLastRefreshedAt).getTime()) > 65000 : true;
+  const blockedRate = (rateTelemetry.allowed + rateTelemetry.blocked) > 0
+    ? Math.round((rateTelemetry.blocked / (rateTelemetry.allowed + rateTelemetry.blocked)) * 100)
+    : 0;
+  const exportSecuritySignalsCsv = () => {
+    if (visibleSecuritySignals.length === 0) return;
+    const header = ['signal_id', 'action', 'severity', 'created_at', 'acknowledged', 'acknowledged_by', 'acknowledged_at'];
+    const rows = visibleSecuritySignals.map((row) => {
+      const severity = row?.metadata?.severity || (row.action?.includes('retry_burst') ? 'HIGH' : 'MEDIUM');
+      const ackInfo = acknowledgedSignalIds[row.id];
+      return [
+        row.id,
+        row.action || '',
+        severity,
+        row.created_at || '',
+        ackInfo?.acknowledged ? 'yes' : 'no',
+        ackInfo?.actorId || '',
+        ackInfo?.acknowledgedAt || '',
+      ];
+    });
+    const csv = [header, ...rows]
+      .map((cols) => cols.map((v) => `"${String(v || '').replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `security-signals-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div style={s.container}>
@@ -207,7 +575,7 @@ const AdminDashboard = () => {
       <div style={{ ...s.main, padding: isSmall ? '70px 12px 70px' : '25px' }}>
         <div style={{ ...s.header, flexDirection: isSmall ? 'column' : 'row', gap: isSmall ? '10px' : '0', alignItems: 'flex-start' }}>
           <div>
-            <button style={{ background:'rgba(201,168,76,0.08)', border:'1px solid rgba(201,168,76,0.2)', color:'#c9a84c', borderRadius:'20px', padding:'5px 12px 5px 8px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px', display:'flex', alignItems:'center', gap:'5px', width:'fit-content' }} onClick={() => { const tabs=['overview','machines','clients','owners','operators','wallet','reports','iot']; const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>&#8592;</button>
+            <button style={{ background:'rgba(201,168,76,0.08)', border:'1px solid rgba(201,168,76,0.2)', color:'#c9a84c', borderRadius:'20px', padding:'5px 12px 5px 8px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px', display:'flex', alignItems:'center', gap:'5px', width:'fit-content' }} onClick={() => { const tabs=['overview','machines','bookings','clients','operators','wallet','approvals','dlq','audit','reports']; const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>&#8592;</button>
             <h2 style={{ ...s.pageTitle, fontSize: isSmall ? '16px' : '22px' }}>
               {NAV.find(n => n.id === activeTab)?.icon}{' '}
               {NAV.find(n => n.id === activeTab)?.label}
@@ -304,6 +672,158 @@ const AdminDashboard = () => {
                   <div key={i} style={{ ...s.alertRow, borderLeft: `3px solid ${a.color}` }}>
                     <p style={s.alertMsg}>{a.icon} {a.msg}</p>
                     <p style={s.alertTime}>{a.time}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ ...s.bottomRow, gridTemplateColumns: isSmall ? '1fr' : '1fr 1fr', marginTop: '20px' }}>
+              <div style={s.bottomCard}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                  <h3 style={{ ...s.bottomTitle, margin: 0 }}>🛡️ Security Signals</h3>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                    {['ALL', 'HIGH', 'MEDIUM'].map((level) => (
+                      <button
+                        key={level}
+                        style={{
+                          background: securitySeverityFilter === level ? 'rgba(201,168,76,0.2)' : 'rgba(201,168,76,0.08)',
+                          border: securitySeverityFilter === level ? '1px solid rgba(201,168,76,0.5)' : '1px solid rgba(201,168,76,0.28)',
+                          color: '#c9a84c',
+                          borderRadius: '12px',
+                          padding: '2px 8px',
+                          fontSize: '10px',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => setSecuritySeverityFilter(level)}
+                      >
+                        {level}
+                      </button>
+                    ))}
+                    <button
+                      style={{ background: 'rgba(201,168,76,0.12)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', cursor: securityRefreshing ? 'wait' : 'pointer', opacity: securityRefreshing ? 0.7 : 1 }}
+                      onClick={refreshSecurityPanel}
+                      disabled={securityRefreshing}
+                    >
+                      {securityRefreshing ? 'Refreshing...' : 'Refresh'}
+                    </button>
+                    <button
+                      style={{ background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', cursor: 'pointer' }}
+                      onClick={exportSecuritySignalsCsv}
+                    >
+                      Export CSV
+                    </button>
+                  </div>
+                </div>
+                <p style={{ color: isSecurityStale ? '#ff9aa8' : '#8896a8', fontSize: '10px', margin: '0 0 8px' }}>
+                  Last refreshed: {securityLastRefreshedAt ? new Date(securityLastRefreshedAt).toLocaleTimeString('en-IN') : 'never'} {isSecurityStale ? '(stale)' : '(live)'}
+                </p>
+                {securityPanelMessage && (
+                  <p style={{ color: '#ff9aa8', fontSize: '10px', margin: '0 0 8px' }}>{securityPanelMessage}</p>
+                )}
+                {visibleSecuritySignals.length === 0 ? (
+                  <p style={{ color: '#8896a8', fontSize: '12px', margin: 0 }}>No recent suspicious signals.</p>
+                ) : (
+                  <div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+                      <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '8px' }}>
+                        <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 4px' }}>HIGH Trend</p>
+                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>
+                          <div style={{ width: `${Math.round((highCount / severityMax) * 100)}%`, height: '100%', background: '#e94560', borderRadius: '4px' }} />
+                        </div>
+                        <p style={{ color: '#ff9aa8', fontSize: '10px', margin: '4px 0 0' }}>{highCount}</p>
+                      </div>
+                      <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '8px' }}>
+                        <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 4px' }}>MEDIUM Trend</p>
+                        <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>
+                          <div style={{ width: `${Math.round((mediumCount / severityMax) * 100)}%`, height: '100%', background: '#FFB74D', borderRadius: '4px' }} />
+                        </div>
+                        <p style={{ color: '#FFB74D', fontSize: '10px', margin: '4px 0 0' }}>{mediumCount}</p>
+                      </div>
+                    </div>
+                  {visibleSecuritySignals.map((row) => {
+                    const severity = row?.metadata?.severity || (row.action?.includes('retry_burst') ? 'HIGH' : 'MEDIUM');
+                    const ackInfo = acknowledgedSignalIds[row.id];
+                    const isAcked = Boolean(ackInfo?.acknowledged);
+                    return (
+                    <div key={row.id} style={s.alertRow}>
+                      <p style={s.alertMsg}>
+                        {row.action}
+                        <span style={{
+                          marginLeft: '8px',
+                          fontSize: '10px',
+                          padding: '2px 6px',
+                          borderRadius: '10px',
+                          border: severity === 'HIGH' ? '1px solid rgba(233,69,96,0.45)' : '1px solid rgba(255,152,0,0.45)',
+                          color: severity === 'HIGH' ? '#ff9aa8' : '#FFB74D',
+                          background: severity === 'HIGH' ? 'rgba(233,69,96,0.14)' : 'rgba(255,152,0,0.14)',
+                        }}>
+                          {severity}
+                        </span>
+                      </p>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                        <p style={s.alertTime}>
+                          {row.created_at ? new Date(row.created_at).toLocaleString('en-IN') : '-'}
+                          {isAcked ? ` | Ack: ${ackInfo?.actorId || '-'} @ ${ackInfo?.acknowledgedAt ? new Date(ackInfo.acknowledgedAt).toLocaleString('en-IN') : '-'}` : ''}
+                        </p>
+                        <button
+                          style={{ background: isAcked ? 'rgba(76,175,80,0.18)' : 'rgba(201,168,76,0.12)', border: isAcked ? '1px solid rgba(76,175,80,0.45)' : '1px solid rgba(201,168,76,0.35)', color: isAcked ? '#4CAF50' : '#c9a84c', borderRadius: '6px', padding: '3px 8px', fontSize: '10px', cursor: isAcked ? 'default' : 'pointer' }}
+                          disabled={isAcked}
+                          onClick={async () => {
+                            const ackResult = await acknowledgeSecuritySignal(row.id);
+                            if (ackResult.ok) {
+                              setAcknowledgedSignalIds((prev) => ({
+                                ...prev,
+                                [row.id]: {
+                                  acknowledged: true,
+                                  actorId: ackResult.acknowledgedBy || getCurrentAdminId(),
+                                  acknowledgedAt: ackResult.acknowledgedAt || new Date().toISOString(),
+                                },
+                              }));
+                              refreshSecurityPanel();
+                            }
+                          }}
+                        >
+                          {isAcked ? 'Acknowledged' : 'Acknowledge'}
+                        </button>
+                      </div>
+                    </div>
+                    );
+                  })}
+                  </div>
+                )}
+              </div>
+              <div style={s.bottomCard}>
+                <h3 style={s.bottomTitle}>📈 Rate Limit Telemetry</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginBottom: '10px' }}>
+                  <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                    <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>Allowed</p>
+                    <p style={{ color: '#4CAF50', margin: 0, fontWeight: '700' }}>{rateTelemetry.allowed || 0}</p>
+                  </div>
+                  <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                    <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>Blocked</p>
+                    <p style={{ color: '#e94560', margin: 0, fontWeight: '700' }}>{rateTelemetry.blocked || 0}</p>
+                  </div>
+                  <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                    <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>Active Buckets</p>
+                    <p style={{ color: '#c9a84c', margin: 0, fontWeight: '700' }}>{rateTelemetry.activeBuckets || 0}</p>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
+                  <p style={{ color: '#8896a8', fontSize: '11px', margin: 0 }}>Blocked Rate: {blockedRate}%</p>
+                  <span style={{
+                    border: blockedRate >= 15 ? '1px solid rgba(233,69,96,0.45)' : '1px solid rgba(76,175,80,0.45)',
+                    color: blockedRate >= 15 ? '#ff9aa8' : '#4CAF50',
+                    background: blockedRate >= 15 ? 'rgba(233,69,96,0.14)' : 'rgba(76,175,80,0.14)',
+                    borderRadius: '10px',
+                    padding: '2px 8px',
+                    fontSize: '10px',
+                  }}>
+                    {blockedRate >= 15 ? 'ALERT' : 'NORMAL'}
+                  </span>
+                </div>
+                {(rateTelemetry.byRoute || []).slice(0, 5).map((x) => (
+                  <div key={x.route} style={s.alertRow}>
+                    <p style={s.alertMsg}>{x.route}</p>
+                    <p style={s.alertTime}>hits: {x.count}</p>
                   </div>
                 ))}
               </div>
@@ -545,6 +1065,300 @@ const AdminDashboard = () => {
                   ))}
                 </tbody>
               </table>
+            )}
+          </div>
+        )}
+
+        {!loading && activeTab === 'dlq' && (
+          <div style={s.tableCard}>
+            <h3 style={s.tableTitle}>DLQ Items ({dlqData.length})</h3>
+            {dlqMessage && (
+              <div style={{ background: dlqMessage.toLowerCase().includes('error') ? 'rgba(233,69,96,0.14)' : 'rgba(76,175,80,0.12)', border: dlqMessage.toLowerCase().includes('error') ? '1px solid rgba(233,69,96,0.45)' : '1px solid rgba(76,175,80,0.4)', color: dlqMessage.toLowerCase().includes('error') ? '#ff9aa8' : '#4CAF50', borderRadius: '8px', padding: '8px 10px', marginBottom: '10px', fontSize: '12px' }}>
+                {dlqMessage}
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: isSmall ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: '10px', marginBottom: '14px' }}>
+              {[
+                { label: '24h Total', val: dlqStats.totalLast24h || 0 },
+                { label: '24h Failed', val: dlqStats.failedLast24h || 0 },
+                { label: '24h Retried', val: dlqStats.retriedLast24h || 0 },
+                { label: '24h Peak/Hour', val: Math.max(0, ...(dlqStats.hourly || []).map((x) => x.count || 0)) },
+              ].map((item) => (
+                <div key={item.label} style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
+                  <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 4px' }}>{item.label}</p>
+                  <p style={{ color: '#c9a84c', fontWeight: '700', margin: 0 }}>{item.val}</p>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: isSmall ? 'repeat(2,1fr)' : 'repeat(6,1fr)', gap: '10px', marginBottom: '14px' }}>
+              {[
+                { label: 'Total', val: dlqCounters.total || 0 },
+                { label: 'Failed', val: dlqCounters.failed || 0 },
+                { label: 'Retried', val: dlqCounters.retried || 0 },
+                { label: 'WhatsApp', val: dlqCounters.whatsapp || 0 },
+                { label: 'Email', val: dlqCounters.email || 0 },
+                { label: 'Alert', val: dlqCounters.alert || 0 },
+              ].map((item) => (
+                <div key={item.label} style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
+                  <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 4px' }}>{item.label}</p>
+                  <p style={{ color: '#c9a84c', fontWeight: '700', margin: 0 }}>{item.val}</p>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+              <select value={dlqQueueFilter} onChange={(e) => setDlqQueueFilter(e.target.value)} style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}>
+                <option value="">All Queues</option>
+                <option value="whatsapp">whatsapp</option>
+                <option value="email">email</option>
+                <option value="alert">alert</option>
+                <option value="pdf">pdf</option>
+              </select>
+              <select value={dlqStatusFilter} onChange={(e) => setDlqStatusFilter(e.target.value)} style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}>
+                <option value="">All Status</option>
+                <option value="failed">failed</option>
+                <option value="retried">retried</option>
+              </select>
+            </div>
+            <div style={{ marginBottom: '12px' }}>
+              <p style={{ color: '#8896a8', fontSize: '11px', margin: '0 0 6px' }}>Last 24h Queue Volume</p>
+              <div style={{ display: 'grid', gridTemplateColumns: isSmall ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: '8px' }}>
+                {Object.entries(dlqStats.queueCounts || {}).map(([queueName, count]) => (
+                  <div key={queueName} style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '6px', padding: '8px', textAlign: 'center' }}>
+                    <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 2px' }}>{queueName}</p>
+                    <p style={{ color: '#c9a84c', fontWeight: '700', margin: 0 }}>{count}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            {dlqData.length === 0 ? (
+              <p style={{ color: '#8896a8', textAlign: 'center', padding: '20px' }}>No DLQ items</p>
+            ) : (
+              <div>
+                <table style={s.table}>
+                  <thead><tr>{['Queue', 'Job', 'Error', 'Created', 'Retried By', 'Retried At', 'Action'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
+                  <tbody>
+                    {dlqData.map((item) => (
+                      <tr key={item.id} style={s.tr}>
+                        <td style={s.td}>{item.queue_name}</td>
+                        <td style={s.td}>{item.job_name}</td>
+                        <td style={{ ...s.td, maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.error || '-'}</td>
+                        <td style={s.td}>{item.created_at ? new Date(item.created_at).toLocaleString('en-IN') : '-'}</td>
+                        <td style={s.td}>{item.retried_by || '-'}</td>
+                        <td style={s.td}>{item.retried_at ? new Date(item.retried_at).toLocaleString('en-IN') : '-'}</td>
+                        <td style={s.td}>
+                          <button
+                            style={{ background: 'rgba(76,175,80,0.1)', border: '1px solid #4CAF50', color: '#4CAF50', padding: '4px 10px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}
+                            onClick={async () => {
+                              setSelectedDlqItem(item);
+                              setDlqRetryReason('');
+                            }}
+                          >
+                            Retry
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {dlqHasMore && (
+                  <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+                    <button
+                      style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '8px', padding: '8px 14px', cursor: dlqLoadingMore ? 'wait' : 'pointer', opacity: dlqLoadingMore ? 0.7 : 1 }}
+                      disabled={dlqLoadingMore}
+                      onClick={loadMoreDlq}
+                    >
+                      {dlqLoadingMore ? 'Loading...' : 'Load More DLQ'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {selectedDlqItem && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
+            <div style={{ width: isSmall ? '92%' : '420px', background: 'linear-gradient(135deg, #0f2040, #0a1628)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '12px', padding: '16px' }}>
+              <h3 style={{ color: '#c9a84c', marginTop: 0 }}>Retry DLQ Item #{selectedDlqItem.id}</h3>
+              <p style={{ color: '#8896a8', fontSize: '12px' }}>Queue: {selectedDlqItem.queue_name} | Job: {selectedDlqItem.job_name}</p>
+              <textarea
+                value={dlqRetryReason}
+                onChange={(e) => setDlqRetryReason(e.target.value)}
+                placeholder="Retry reason (for audit)"
+                style={{ width: '100%', minHeight: '88px', background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '8px', padding: '8px', boxSizing: 'border-box' }}
+              />
+              <p style={{ color: '#8896a8', fontSize: '11px', margin: '6px 0 0' }}>Minimum 8 characters required.</p>
+              <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                <button style={{ flex: 1, background: 'transparent', border: '1px solid rgba(255,255,255,0.2)', color: '#8896a8', borderRadius: '8px', padding: '8px', cursor: 'pointer' }} onClick={() => setSelectedDlqItem(null)}>Cancel</button>
+                <button
+                  style={{ flex: 1, background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50', borderRadius: '8px', padding: '8px', cursor: dlqRetryReason.trim().length >= 8 ? 'pointer' : 'not-allowed', opacity: dlqRetryReason.trim().length >= 8 ? 1 : 0.6 }}
+                  disabled={dlqRetryReason.trim().length < 8}
+                  onClick={async () => {
+                    const previous = [...dlqData];
+                    const itemId = selectedDlqItem.id;
+                    setDlqData((prev) => prev.filter((x) => x.id !== itemId));
+                    setSelectedDlqItem(null);
+                    const ok = await retryDlqItem(itemId, dlqRetryReason);
+                    if (ok) {
+                      setDlqMessage(`DLQ item ${itemId} retried successfully.`);
+                    } else {
+                      setDlqData(previous);
+                      setDlqMessage(`Retry failed for DLQ item ${itemId}.`);
+                    }
+                    setTimeout(() => setDlqMessage(''), 3000);
+                  }}
+                >
+                  Confirm Retry
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {!loading && activeTab === 'audit' && (
+          <div style={s.tableCard}>
+            <h3 style={s.tableTitle}>Audit Logs ({visibleAuditLogs.length})</h3>
+            {auditMessage && (
+              <div style={{ background: auditMessage.toLowerCase().includes('error') ? 'rgba(233,69,96,0.14)' : 'rgba(76,175,80,0.12)', border: auditMessage.toLowerCase().includes('error') ? '1px solid rgba(233,69,96,0.45)' : '1px solid rgba(76,175,80,0.4)', color: auditMessage.toLowerCase().includes('error') ? '#ff9aa8' : '#4CAF50', borderRadius: '8px', padding: '8px 10px', marginBottom: '10px', fontSize: '12px' }}>
+                {auditMessage}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+              <input
+                value={auditActionFilter}
+                onChange={(e) => setAuditActionFilter(e.target.value)}
+                placeholder="Filter action (e.g. dlq_retry)"
+                style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}
+              />
+              <input
+                value={auditActorFilter}
+                onChange={(e) => setAuditActorFilter(e.target.value)}
+                placeholder="Filter actorId"
+                style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}
+              />
+              <select value={auditRoleFilter} onChange={(e) => setAuditRoleFilter(e.target.value)} style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}>
+                <option value="">All Roles</option>
+                <option value="admin">admin</option>
+                <option value="owner">owner</option>
+                <option value="client">client</option>
+                <option value="operator">operator</option>
+              </select>
+              <input
+                value={auditEntityFilter}
+                onChange={(e) => setAuditEntityFilter(e.target.value)}
+                placeholder="Entity type (e.g. dead_letter_queue)"
+                style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}
+              />
+              <input
+                value={auditMetaFilter}
+                onChange={(e) => setAuditMetaFilter(e.target.value)}
+                placeholder="Search metadata JSON"
+                style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}
+              />
+              <input
+                type="datetime-local"
+                value={auditFrom}
+                onChange={(e) => setAuditFrom(e.target.value)}
+                style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}
+              />
+              <input
+                type="datetime-local"
+                value={auditTo}
+                onChange={(e) => setAuditTo(e.target.value)}
+                style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}
+              />
+              <button style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={() => setAuditPreset('today')}>Today</button>
+              <button style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={() => setAuditPreset('24h')}>24h</button>
+              <button style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={() => setAuditPreset('7d')}>7d</button>
+              <button style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={() => setAuditPreset('')}>Reset</button>
+              <button style={{ background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={exportAuditCsv}>Export CSV</button>
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ color: '#8896a8', fontSize: '11px' }}>Timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone} (local)</span>
+              <button style={{ background: 'transparent', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={clearAllAuditFilters}>Clear All</button>
+              {auditActionFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('action')}>action x</button>}
+              {auditActorFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('actor')}>actor x</button>}
+              {auditRoleFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('role')}>role x</button>}
+              {auditEntityFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('entity')}>entity x</button>}
+              {auditMetaFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('meta')}>meta x</button>}
+              {auditFrom && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('from')}>from x</button>}
+              {auditTo && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('to')}>to x</button>}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+              {Object.keys(csvColumns).map((key) => (
+                <label key={key} style={{ color: '#8896a8', fontSize: '11px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <input
+                    type="checkbox"
+                    checked={csvColumns[key]}
+                    onChange={(e) => setCsvColumns((prev) => ({ ...prev, [key]: e.target.checked }))}
+                  />
+                  {key}
+                </label>
+              ))}
+            </div>
+            {visibleAuditLogs.length === 0 ? (
+              <p style={{ color: '#8896a8', textAlign: 'center', padding: '20px' }}>No audit logs</p>
+            ) : (
+              <div>
+                <table style={s.table}>
+                  <thead><tr>{['When', 'Action', 'Actor', 'Role', 'Entity', 'Entity ID', 'Meta'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
+                </table>
+                <div
+                  style={{ maxHeight: '430px', overflowY: 'auto', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '8px' }}
+                  onScroll={(e) => setAuditScrollTop(e.target.scrollTop)}
+                >
+                  <table style={{ ...s.table, minWidth: '100%' }}>
+                    <tbody>
+                      {auditVirtualWindow.useVirtual && auditVirtualWindow.topPad > 0 && (
+                        <tr><td colSpan={7} style={{ padding: 0, height: `${auditVirtualWindow.topPad}px` }} /></tr>
+                      )}
+                      {auditVirtualWindow.items.map((row) => (
+                        <React.Fragment key={row.id}>
+                          <tr style={s.tr}>
+                            <td style={s.td}>{row.created_at ? new Date(row.created_at).toLocaleString('en-IN') : '-'}</td>
+                            <td style={s.td}>{row.action}</td>
+                            <td style={s.td}>{row.actor_id || '-'}</td>
+                            <td style={s.td}>{row.actor_role || '-'}</td>
+                            <td style={s.td}>{row.entity_type || '-'}</td>
+                            <td style={s.td}>{row.entity_id || '-'}</td>
+                            <td style={s.td}>
+                              <button
+                                style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', color: '#c9a84c', padding: '3px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}
+                                onClick={() => setExpandedAuditRows((prev) => ({ ...prev, [row.id]: !prev[row.id] }))}
+                              >
+                                {expandedAuditRows[row.id] ? 'Hide' : 'View'}
+                              </button>
+                            </td>
+                          </tr>
+                          {expandedAuditRows[row.id] && (
+                            <tr style={s.tr}>
+                              <td style={s.td} colSpan={7}>
+                                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#8896a8', fontSize: '11px' }}>
+                                  {JSON.stringify(row.metadata || {}, null, 2)}
+                                </pre>
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      ))}
+                      {auditVirtualWindow.useVirtual && auditVirtualWindow.bottomPad > 0 && (
+                        <tr><td colSpan={7} style={{ padding: 0, height: `${auditVirtualWindow.bottomPad}px` }} /></tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+                {auditHasMore && (
+                  <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+                    <button
+                      style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '8px', padding: '8px 14px', cursor: auditLoadingMore ? 'wait' : 'pointer', opacity: auditLoadingMore ? 0.7 : 1 }}
+                      disabled={auditLoadingMore}
+                      onClick={loadMoreAuditLogs}
+                    >
+                      {auditLoadingMore ? 'Loading...' : 'Load More Logs'}
+                    </button>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
