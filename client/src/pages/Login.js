@@ -1,9 +1,9 @@
-import { supabase } from '../supabaseClient';
 // import { requestNotificationPermission } from '../firebase';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 const Login = () => {
+  const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
   const navigate = useNavigate();
   const [role, setRole] = useState('admin');
   const [email, setEmail] = useState('');
@@ -20,20 +20,20 @@ const Login = () => {
     setLoading(true);
     setError('');
     try {
-      const { data, error: dbError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', email)
-        .eq('role', role)
-        .single();
-
-      if (dbError || !data) {
-        setError('Invalid Email, Password kiva Role!');
+      const response = await fetch(`${API_BASE_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, role }),
+      });
+      const result = await response.json();
+      if (!response.ok || !result?.user || !result?.token || !result?.refreshToken) {
+        setError(result?.error || 'Invalid Email, Password kiva Role!');
         setLoading(false);
         return;
       }
-      localStorage.setItem('machineos_user', JSON.stringify(data));
-      
+      localStorage.setItem('machineos_user', JSON.stringify(result.user));
+      localStorage.setItem('machineos_token', result.token);
+      localStorage.setItem('machineos_refresh_token', result.refreshToken);
       navigate('/' + role);
     } catch (err) {
       setError('Login failed — please try again');
@@ -42,17 +42,7 @@ const Login = () => {
   };
 
   const handleSignup = async () => {
-    const { name, company, email, phone, gstin, password } = signup;
-    if (!name || !company || !email || !phone || !password) { setSignupError('सगळे fields भरा!'); return; }
-    setLoading(true);
-    try {
-      const { error } = await supabase.from('users').insert([{ name: company, email, phone, role: 'client', password_hash: password, gstin: gstin || null }]);
-      if (error) { setSignupError('Registration failed: ' + error.message); setLoading(false); return; }
-      // WhatsApp alert to admin
-      fetch('https://xoqolkqsdkfwxveuwlow.supabase.co/functions/v1/send_whatsapp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: '+918408000084', message: 'New Client Registration!\nName: ' + name + '\nCompany: ' + company + '\nEmail: ' + email + '\nPhone: ' + phone }) }).catch(() => {});
-      setSignupSuccess(true);
-    } catch (err) { setSignupError('Error: ' + err.message); }
-    setLoading(false);
+    setSignupError('Secure signup migration in progress. Please contact admin for account creation.');
   };
 
   const ROLES = [
@@ -148,21 +138,10 @@ const Login = () => {
             <button style={{ background: 'transparent', border: 'none', color: '#c9a84c', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline' }} onClick={() => setShowSignup(true)}>New Client? Register Here</button>
           </div>
           <div style={s.demoBox}>
-            <p style={s.demoTitle}>Demo Credentials:</p>
-            <div style={s.demoGrid}>
-              {[
-                { role: 'Admin', email: 'om.chavan2026@zohomail.in', pass: 'admin1234' },
-                { role: 'Client', email: 'billing@patilbuilders.com', pass: 'client1234' },
-                { role: 'Owner', email: 'rajesh.patil@gmail.com', pass: 'owner1234' },
-                { role: 'Operator', email: 'ramesh.kadam@gmail.com', pass: 'operator1234' },
-              ].map((d, i) => (
-                <button key={i} style={s.demoBtn}
-                  onClick={() => { setRole(d.role.toLowerCase()); setEmail(d.email); setPassword(d.pass); setError(''); }}>
-                  <span style={{ color: '#c9a84c', fontWeight: '700', fontSize: '11px' }}>{d.role}</span>
-                  <span style={{ color: '#8896a8', fontSize: '9px', display: 'block' }}>{d.email}</span>
-                </button>
-              ))}
-            </div>
+            <p style={s.demoTitle}>Security Notice:</p>
+            <p style={{ color: '#8896a8', fontSize: '11px', margin: 0 }}>
+              Demo shortcuts are disabled in hardened mode. Use authorized credentials only.
+            </p>
           </div>
 
           <div style={s.cardFooter}>

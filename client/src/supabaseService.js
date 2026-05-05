@@ -1,111 +1,156 @@
 import { supabase } from './supabaseClient';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+
+async function secureFetch(path, options = {}) {
+  let token = localStorage.getItem('machineos_token');
+  const execute = async (activeToken) => fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${activeToken || ''}`,
+      ...(options.headers || {}),
+    },
+  });
+
+  let response = await execute(token);
+  if (response.status === 401) {
+    const refreshToken = localStorage.getItem('machineos_refresh_token');
+    if (refreshToken) {
+      const refreshResponse = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken }),
+      });
+      if (refreshResponse.ok) {
+        const refreshPayload = await refreshResponse.json().catch(() => ({}));
+        if (refreshPayload?.token) {
+          localStorage.setItem('machineos_token', refreshPayload.token);
+          token = refreshPayload.token;
+          response = await execute(token);
+        }
+      }
+    }
+  }
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || `Request failed: ${response.status}`);
+  return payload;
+}
 
 // ─── MACHINES ───
 export const getMachines = async () => {
-  const { data, error } = await supabase
-    .from('machines')
-    .select('*')
-    .order('machine_id');
+  try {
+    const token = localStorage.getItem('machineos_token');
+    const user = JSON.parse(localStorage.getItem('machineos_user') || '{}');
+    if (token && user?.role === 'admin') {
+      const result = await secureFetch('/api/admin/machines');
+      return result.items || [];
+    }
+  } catch (error) {
+    console.error(error);
+  }
+
+  const { data, error } = await supabase.from('machines').select('*').order('machine_id');
   if (error) { console.error(error); return []; }
   return data;
 };
 
 // ─── BOOKINGS ───
 export const createBooking = async (booking) => {
-  const { data, error } = await supabase
-    .from('bookings')
-    .insert([booking])
-    .select()
-    .single();
-  if (error) { console.error(error); return null; }
-  return data;
+  try {
+    const result = await secureFetch('/api/bookings', {
+      method: 'POST',
+      body: JSON.stringify({
+        machineId: booking.machine_id,
+        bookingType: booking.booking_type,
+        quantity: booking.quantity,
+        baseAmount: booking.base_amount,
+        gstAmount: booking.gst_amount,
+        totalAmount: booking.total_amount,
+        advancePaid: booking.advance_paid,
+        location: booking.location,
+        startDate: booking.start_date,
+        endDate: booking.end_date || null,
+      }),
+    });
+    return result.booking || null;
+  } catch (error) {
+    console.error(error);
+    return null;
+  }
 };
 
 export const getBookingsByClient = async (clientId) => {
-  const { data, error } = await supabase
-    .from('bookings')
-    .select('*, machines(*)')
-    .eq('client_id', clientId)
-    .order('created_at', { ascending: false });
-  if (error) { console.error(error); return []; }
-  return data;
+  try {
+    const result = await secureFetch('/api/bookings/me');
+    return (result.items || []).filter((item) => item.client_id === clientId);
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 };
 
 export const getAllBookings = async () => {
-  const { data, error } = await supabase
-    .from('bookings')
-    .select('*')
-    .order('created_at', { ascending: false });
-  if (error) { console.error(error); return []; }
-  return data;
+  try {
+    const result = await secureFetch('/api/admin/bookings');
+    return result.items || [];
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 };
 
 // ─── WALLET ───
 export const getWalletBalance = async (userId) => {
-  const { data, error } = await supabase
-    .from('wallets')
-    .select('balance')
-    .eq('user_id', userId)
-    .single();
-  if (error) { console.error(error); return 0; }
-  return data?.balance || 0;
+  try {
+    const result = await secureFetch(`/api/wallet/${userId}/balance`);
+    return result?.balance || 0;
+  } catch (error) {
+    console.error(error);
+    return 0;
+  }
 };
 
 export const updateWalletBalance = async (userId, amount) => {
-  const { data: wallet } = await supabase
-    .from('wallets')
-    .select('balance')
-    .eq('user_id', userId)
-    .single();
-  const newBalance = (wallet?.balance || 0) + amount;
-  const { error } = await supabase
-    .from('wallets')
-    .update({ balance: newBalance, updated_at: new Date().toISOString() })
-    .eq('user_id', userId);
-  if (error) { console.error(error); return false; }
-  return true;
+  console.warn('updateWalletBalance is deprecated on client. Use backend wallet APIs.');
+  return false;
 };
 
 // ─── TRANSACTIONS ───
 export const addTransaction = async (transaction) => {
-  const { error } = await supabase
-    .from('transactions')
-    .insert([transaction]);
-  if (error) { console.error(error); return false; }
-  return true;
+  console.warn('addTransaction is deprecated on client. Use backend transactional APIs.');
+  return false;
 };
 
 export const getTransactionsByUser = async (userId) => {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .order('created_at', { ascending: false })
-    .limit(10);
-  if (error) { console.error(error); return []; }
-  return data;
+  try {
+    const result = await secureFetch('/api/bookings/me/transactions');
+    return (result.items || []).filter((item) => item.user_id === userId);
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 };
 
 export const getAllTransactions = async () => {
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(50);
-  if (error) { console.error(error); return []; }
-  return data;
+  try {
+    const result = await secureFetch('/api/admin/transactions');
+    return result.items || [];
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 };
 
 // ─── USERS ───
 export const getAllUsers = async () => {
-  const { data, error } = await supabase
-    .from('users')
-    .select('*')
-    .order('created_at', { ascending: false });
-  if (error) { console.error(error); return []; }
-  const users = data || [];
-  const { data: wallets } = await supabase.from('wallets').select('user_id, balance');
-  return users.map(u => ({ ...u, wallet_balance: (wallets || []).find(w => w.user_id === u.id)?.balance || 0 }));
+  try {
+    const result = await secureFetch('/api/admin/users');
+    return result.items || [];
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 };
 export const getAllClients = async () => {
   const { data, error } = await supabase
@@ -181,12 +226,13 @@ export const reportIssue = async (issue) => {
 };
 
 export const getAllIssues = async () => {
-  const { data, error } = await supabase
-    .from('issues')
-    .select('*')
-    .order('created_at', { ascending: false });
-  if (error) { console.error(error); return []; }
-  return data;
+  try {
+    const result = await secureFetch('/api/admin/issues');
+    return result.items || [];
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 };
 
 // ─── MACHINE STATUS UPDATE ───
@@ -208,40 +254,53 @@ export const updateMachineFuel = async (machineId, fuelLevel) => {
   return true;
 };
 export const getPendingUsers = async () => {
-  const { data, error } = await supabase.from('users').select('*').eq('status', 'pending').order('created_at', { ascending: false });
-  if (error) { console.error(error); return []; }
-  return data || [];
+  try {
+    const result = await secureFetch('/api/admin/users/pending');
+    return result.items || [];
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 };
 
 export const approveUser = async (userId) => {
-  const { error } = await supabase.from('users').update({ status: 'active' }).eq('id', userId);
-  if (error) { console.error(error); return false; }
-  await supabase.from('wallets').upsert({ user_id: userId, balance: 0 });
-  return true;
+  try {
+    await secureFetch(`/api/admin/users/${userId}/approve`, { method: 'PATCH' });
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
 };
 
 export const rejectUser = async (userId) => {
-  const { error } = await supabase.from('users').update({ status: 'rejected' }).eq('id', userId);
-  if (error) { console.error(error); return false; }
-  return true;
+  try {
+    await secureFetch(`/api/admin/users/${userId}/reject`, { method: 'PATCH' });
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
 };
 
 export const getOwnerBookings = async () => {
-  const { data, error } = await supabase
-    .from('bookings')
-    .select('*, users!bookings_client_id_fkey(name, phone), machines!bookings_machine_id_fkey(machine_id, name)')
-    .order('created_at', { ascending: false });
-  if (error) { console.error(error); return []; }
-  return data || [];
+  try {
+    const result = await secureFetch('/api/owner/bookings');
+    return result.items || [];
+  } catch (error) {
+    console.error(error);
+    return [];
+  }
 };
 
 export const approveBooking = async (bookingId) => {
-  const { error } = await supabase
-    .from('bookings')
-    .update({ owner_approved: true, owner_approved_at: new Date().toISOString() })
-    .eq('id', bookingId);
-  if (error) { console.error(error); return false; }
-  return true;
+  try {
+    await secureFetch(`/api/owner/bookings/${bookingId}/approve`, { method: 'PATCH' });
+    return true;
+  } catch (error) {
+    console.error(error);
+    return false;
+  }
 };
 
 

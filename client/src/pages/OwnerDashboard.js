@@ -111,10 +111,8 @@ const OwnerMonthAccordion = ({ month, days, isSmall, s, setOwnerBookings, ownerB
                         {!b.owner_approved && (
                           <button style={{ width: '100%', padding: '11px', background: 'linear-gradient(135deg, #2e7d32, #4CAF50)', color: '#fff', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}
                             onClick={async () => {
-                              const { approveBooking } = await import('../supabaseService');
                               await approveBooking(b.id);
                               setOwnerBookings(prev => prev.map(x => x.id === b.id ? { ...x, owner_approved: true } : x));
-                              fetch('https://xoqolkqsdkfwxveuwlow.supabase.co/functions/v1/send_whatsapp', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ to: '+918408000084', message: 'Owner Approved!\\nRef: ' + b.booking_ref + '\\nMachine: ' + (b.machines ? b.machines.machine_id : 'N/A') + '\\nLocation: ' + (b.location || 'N/A') }) }).catch(() => {});
                               alert('Approved! Machine dispatched.');
                             }}>
                             {String.fromCodePoint(0x2705)} Approve & Dispatch Machine

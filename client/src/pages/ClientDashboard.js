@@ -9,8 +9,8 @@ import MobileNav from '../components/MobileNav';
 import BookingCalendar from '../components/BookingCalendar';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { sendBookingConfirmation } from '../emailService';
-import { sendBookingWhatsApp, sendBookingNotifications, sendWalletNotification } from '../whatsappService';
-import { getMachines, createBooking, getWalletBalance, updateWalletBalance, addTransaction, getBookingsByClient, getTransactionsByUser } from '../supabaseService';
+import { sendBookingNotifications, sendWalletNotification } from '../whatsappService';
+import { getMachines, createBooking, getWalletBalance, getBookingsByClient, getTransactionsByUser } from '../supabaseService';
 
 const MACHINES = [];
 
@@ -149,7 +149,6 @@ const ClientDashboard = () => {
   const [cancelBooking, setCancelBooking] = useState(null);
   const [cancelledCredit, setCancelledCredit] = useState(null);
   const [machineList, setMachineList] = useState([]);
-  const [transactionData, setTransactionData] = useState([]);
   const [activeBookings, setActiveBookings] = useState([
     { id: 'BK005', machine: 'JCB-001', machineFull: 'JCB 3DX Backhoe Loader', operator: 'Ramesh Kadam', ratePerHour: 1400, type: 'Daily', startTime: '7:30 AM', hours: 7.5, advancePaid: 4200, status: 'Running', location: 'Karad, Satara', fuel: 72, date: '10 Apr 2026' },
   ]);
@@ -182,9 +181,7 @@ const ClientDashboard = () => {
       getBookingsByClient(savedUser.id).then(bks => {
         if (bks && bks.length > 0) setActiveBookings(bks);
       });
-      getTransactionsByUser(savedUser.id).then(txns => {
-        if (txns && txns.length > 0) setTransactionData(txns);
-      });
+      getTransactionsByUser(savedUser.id).catch(() => {});
     }
 
     const walletInterval = setInterval(async () => {
@@ -234,6 +231,7 @@ const ClientDashboard = () => {
     await createBooking({
       booking_ref: bookingRef,
       client_id: user.id,
+      machine_id: selectedMachine.id,
       booking_type: bookingType,
       quantity: quantity,
       base_amount: totalCost,
@@ -244,9 +242,8 @@ const ClientDashboard = () => {
       start_date: new Date().toISOString().split('T')[0],
       location: selectedMachine.location,
     });
-    await updateWalletBalance(user.id, -advanceAmt);
-    await addTransaction({ user_id: user.id, type: 'debit', amount: advanceAmt, description: selectedMachine.name + ' Booking Advance', ref: bookingRef });
-    setWalletBalance(prev => prev - advanceAmt);
+    const refreshedBalance = await getWalletBalance(user.id);
+    setWalletBalance(refreshedBalance);
     setActiveBookings(prev => [...prev, {
       id: bookingRef, machine: selectedMachine.id, machineFull: selectedMachine.name,
       operator: selectedMachine.operator, ratePerHour: selectedMachine.rates.perHour,
@@ -278,34 +275,15 @@ const clientName = CLIENT.name || 'Client';
   
   await initiatePayment({
     amount: amt,
+    userId: CLIENT.id,
     name: clientName,
     email: CLIENT.email || 'machineos@developmentexpress.in',
     phone: CLIENT.phone || '+919766926636',
     description: 'MachineOS Wallet Recharge',
     onSuccess: async (response) => {
-      const newBalance = walletBalance + amt;
-      if (CLIENT?.id) {
-        await updateWalletBalance(CLIENT.id, newBalance);
-        await addTransaction({
-          user_id: CLIENT.id,
-          type: 'credit',
-          amount: amt,
-          description: 'Wallet Recharge - Razorpay',
-          reference: response.razorpay_payment_id
-        });
-      }
+      const newBalance = response?.verification?.newBalance ?? (await getWalletBalance(CLIENT.id));
       setWalletBalance(newBalance);
       setShowRecharge(false);
-      // WhatsApp alert to admin
-fetch('https://xoqolkqsdkfwxveuwlow.supabase.co/functions/v1/send_whatsapp', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    to: '+918408000084',
-    message: 'MachineOS Payment Received!\nClient: ' + (CLIENT.name || 'Client') + '\nAmount: Rs.' + amt.toLocaleString('en-IN') + '\nPayment ID: ' + response.razorpay_payment_id + '\nNew Balance: Rs.' + newBalance.toLocaleString('en-IN')
-  })
-}).catch(e => console.log('WhatsApp error:', e));
-
 alert(String.fromCodePoint(0x2705) + ' Payment Successful!\nRs.' + amt.toLocaleString('en-IN') + ' wallet मध्ये add झाले!\nPayment ID: ' + response.razorpay_payment_id);
     },
     onFailure: () => {
