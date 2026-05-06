@@ -8,7 +8,9 @@
     "dev": "node --watch src/index.js",
     "test": "node --test",
     "check:env": "node scripts/validate-env.js --mode=development",
-    "check:env:prod": "node scripts/validate-env.js --mode=production"
+    "check:env:prod": "node scripts/validate-env.js --mode=production",
+    "phones:audit": "node scripts/normalize-user-phones.js",
+    "phones:apply": "node scripts/normalize-user-phones.js --apply"
   },
   "keywords": [],
   "author": "",

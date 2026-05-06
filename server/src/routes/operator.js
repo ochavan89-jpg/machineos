@@ -11,6 +11,18 @@ const router = express.Router();
 router.use(requireAuth(['operator', 'admin']));
 router.use(createRateLimiter({ windowMs: 60 * 1000, maxHits: 100 }));
 
+function _parseListLimit(raw, fallback = 50, max = 200) {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.min(Math.floor(n), max);
+}
+
+function _parseListOffset(raw) {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.floor(n);
+}
+
 router.post('/attendance', async (req, res) => {
   const { status, checkIn, date } = req.body || {};
   if (!status) return res.status(400).json({ error: 'status is required' });
@@ -36,14 +48,19 @@ router.post('/attendance', async (req, res) => {
 });
 
 router.get('/attendance', async (req, res) => {
+  const limit = _parseListLimit(req.query.limit, 30, 120);
+  const offset = _parseListOffset(req.query.offset);
   const { data, error } = await supabase
     .from('attendance')
     .select('*')
     .eq('operator_id', req.user.id)
     .order('date', { ascending: false })
-    .limit(30);
+    .range(offset, offset + limit);
   if (error) return res.status(500).json({ error: 'Failed to fetch attendance' });
-  return res.json({ items: data || [] });
+  const items = data || [];
+  const hasMore = items.length > limit;
+  const sliced = hasMore ? items.slice(0, limit) : items;
+  return res.json({ items: sliced, limit, offset, hasMore, nextOffset: hasMore ? offset + limit : null });
 });
 
 router.post('/fuel-log', async (req, res) => {
@@ -71,14 +88,19 @@ router.post('/fuel-log', async (req, res) => {
 });
 
 router.get('/fuel-logs', async (req, res) => {
+  const limit = _parseListLimit(req.query.limit, 50, 200);
+  const offset = _parseListOffset(req.query.offset);
   const { data, error } = await supabase
     .from('fuel_logs')
     .select('*')
     .eq('operator_id', req.user.id)
     .order('created_at', { ascending: false })
-    .limit(50);
+    .range(offset, offset + limit);
   if (error) return res.status(500).json({ error: 'Failed to fetch fuel logs' });
-  return res.json({ items: data || [] });
+  const items = data || [];
+  const hasMore = items.length > limit;
+  const sliced = hasMore ? items.slice(0, limit) : items;
+  return res.json({ items: sliced, limit, offset, hasMore, nextOffset: hasMore ? offset + limit : null });
 });
 
 router.post('/issues', async (req, res) => {

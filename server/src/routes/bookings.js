@@ -100,14 +100,17 @@ router.post('/', async (req, res) => {
 });
 
 router.get('/me', async (req, res) => {
+  const parsedLimit = Number(req.query.limit || 120);
+  const limit = Number.isFinite(parsedLimit) && parsedLimit > 0 ? Math.min(Math.floor(parsedLimit), 600) : 120;
   const { data, error } = await supabase
     .from('bookings')
     .select('*, machines(*)')
     .eq('client_id', req.user.id)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .limit(limit);
 
   if (error) return res.status(500).json({ error: 'Failed to fetch bookings' });
-  return res.json({ items: data || [] });
+  return res.json({ items: data || [], limit, hasMore: (data || []).length === limit });
 });
 
 router.get('/me/transactions', async (req, res) => {

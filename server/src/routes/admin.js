@@ -4,6 +4,7 @@ const express = require('express');
 const { supabase } = require('../services/supabase');
 const { requireAuth } = require('../middleware/requireAuth');
 const { createRateLimiter, getRateLimitTelemetry } = require('../middleware/rateLimit');
+const { getApiTelemetry } = require('../middleware/apiTelemetry');
 const { logger } = require('../services/logger');
 const { writeAuditLog } = require('../services/audit');
 const { addJob } = require('../queues');
@@ -16,6 +17,15 @@ const suspiciousRetryBurstThreshold = Math.max(2, Number(process.env.SECURITY_RE
 const suspiciousWindowMs = Math.max(60 * 1000, Number(process.env.SECURITY_SUSPICIOUS_WINDOW_MS || (10 * 60 * 1000)));
 const highSignalAlertCooldownMs = Math.max(30 * 1000, Number(process.env.SECURITY_HIGH_SIGNAL_ALERT_COOLDOWN_MS || (3 * 60 * 1000)));
 const securityAlertQueueEnabled = String(process.env.SECURITY_ALERT_QUEUE_ENABLED || 'true').toLowerCase() !== 'false';
+const apiSloSignalCooldownMs = Math.max(30 * 1000, Number(process.env.SECURITY_API_SLO_SIGNAL_COOLDOWN_MS || (5 * 60 * 1000)));
+const apiSloAlertQueueEnabled = String(process.env.SECURITY_API_SLO_ALERT_QUEUE_ENABLED || 'true').toLowerCase() !== 'false';
+
+function _isMissingOptionalTableError(error, tableName) {
+  if (!error) return false;
+  if (error.code === '42P01') return true;
+  const message = `${error.message || ''} ${error.details || ''} ${error.hint || ''}`.toLowerCase();
+  return message.includes('does not exist') && message.includes(String(tableName || '').toLowerCase());
+}
 
 function _parseIsoDate(value) {
   const text = (value || '').toString().trim();
@@ -66,8 +76,21 @@ function _safeText(value, maxLen = 80) {
   return (value || '').toString().trim().slice(0, maxLen);
 }
 
+function _parseListLimit(req, defaultLimit = 200, maxLimit = 1000) {
+  const parsed = Number(req.query.limit || defaultLimit);
+  if (!Number.isFinite(parsed) || parsed < 1) return defaultLimit;
+  return Math.min(Math.floor(parsed), maxLimit);
+}
+
+function _parseListOffset(req, defaultOffset = 0, maxOffset = 200000) {
+  const parsed = Number(req.query.offset || defaultOffset);
+  if (!Number.isFinite(parsed) || parsed < 0) return defaultOffset;
+  return Math.min(Math.floor(parsed), maxOffset);
+}
+
 const suspiciousBuckets = new Map();
 const highSignalAlertBuckets = new Map();
+const apiSloSignalBuckets = new Map();
 
 async function _trackSuspiciousAdminEvent(req, eventType, threshold, windowMs, metadata = {}) {
   const actorId = req.user?.id || 'unknown';
@@ -124,56 +147,105 @@ async function _trackSuspiciousAdminEvent(req, eventType, threshold, windowMs, m
   }
 }
 
-router.get('/users', async (_req, res) => {
+router.get('/users', async (req, res) => {
+  const limit = _parseListLimit(req, 250, 1000);
+  const offset = _parseListOffset(req, 0, 300000);
   const { data, error } = await supabase
     .from('users')
     .select('id, name, email, phone, role, gstin, status, created_at')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
   if (error) return res.status(500).json({ error: 'Failed to fetch users' });
 
-  const { data: wallets } = await supabase.from('wallets').select('user_id, balance');
+  const userIds = (data || []).map((x) => x.id).filter(Boolean);
+  let wallets = [];
+  if (userIds.length > 0) {
+    const walletsRes = await supabase.from('wallets').select('user_id, balance').in('user_id', userIds);
+    wallets = walletsRes.data || [];
+  }
   const merged = (data || []).map((u) => ({
     ...u,
-    wallet_balance: (wallets || []).find((w) => w.user_id === u.id)?.balance || 0,
+    wallet_balance: wallets.find((w) => w.user_id === u.id)?.balance || 0,
   }));
-  return res.json({ items: merged });
+  return res.json({
+    items: merged,
+    limit,
+    offset,
+    hasMore: merged.length === limit,
+    nextOffset: merged.length === limit ? offset + limit : null,
+  });
 });
 
-router.get('/transactions', async (_req, res) => {
+router.get('/transactions', async (req, res) => {
+  const limit = _parseListLimit(req, 100, 1000);
+  const offset = _parseListOffset(req, 0, 300000);
   const { data, error } = await supabase
     .from('transactions')
     .select('*')
     .order('created_at', { ascending: false })
-    .limit(50);
+    .range(offset, offset + limit - 1);
   if (error) return res.status(500).json({ error: 'Failed to fetch transactions' });
-  return res.json({ items: data || [] });
+  return res.json({
+    items: data || [],
+    limit,
+    offset,
+    hasMore: (data || []).length === limit,
+    nextOffset: (data || []).length === limit ? offset + limit : null,
+  });
 });
 
-router.get('/machines', async (_req, res) => {
+router.get('/machines', async (req, res) => {
+  const limit = _parseListLimit(req, 300, 1200);
+  const offset = _parseListOffset(req, 0, 300000);
   const { data, error } = await supabase
     .from('machines')
     .select('*')
-    .order('machine_id', { ascending: true });
+    .order('machine_id', { ascending: true })
+    .range(offset, offset + limit - 1);
   if (error) return res.status(500).json({ error: 'Failed to fetch machines' });
-  return res.json({ items: data || [] });
+  return res.json({
+    items: data || [],
+    limit,
+    offset,
+    hasMore: (data || []).length === limit,
+    nextOffset: (data || []).length === limit ? offset + limit : null,
+  });
 });
 
-router.get('/bookings', async (_req, res) => {
+router.get('/bookings', async (req, res) => {
+  const limit = _parseListLimit(req, 300, 1500);
+  const offset = _parseListOffset(req, 0, 300000);
   const { data, error } = await supabase
     .from('bookings')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
   if (error) return res.status(500).json({ error: 'Failed to fetch bookings' });
-  return res.json({ items: data || [] });
+  return res.json({
+    items: data || [],
+    limit,
+    offset,
+    hasMore: (data || []).length === limit,
+    nextOffset: (data || []).length === limit ? offset + limit : null,
+  });
 });
 
-router.get('/issues', async (_req, res) => {
+router.get('/issues', async (req, res) => {
+  const limit = _parseListLimit(req, 200, 1000);
+  const offset = _parseListOffset(req, 0, 300000);
   const { data, error } = await supabase
     .from('issues')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
   if (error) return res.status(500).json({ error: 'Failed to fetch issues' });
-  return res.json({ items: data || [] });
+  return res.json({
+    items: data || [],
+    limit,
+    offset,
+    hasMore: (data || []).length === limit,
+    nextOffset: (data || []).length === limit ? offset + limit : null,
+  });
 });
 
 router.get('/dlq', async (req, res) => {
@@ -219,7 +291,19 @@ router.get('/dlq', async (req, res) => {
   }
 
   const { data, error } = await query;
-  if (error) return res.status(500).json({ error: 'Failed to fetch DLQ items' });
+  if (error) {
+    if (_isMissingOptionalTableError(error, 'dead_letter_queue')) {
+      return res.json({
+        count: 0,
+        items: [],
+        counters: { total: 0, failed: 0, retried: 0, whatsapp: 0, email: 0, alert: 0 },
+        nextCursor: null,
+        hasMore: false,
+        degraded: true,
+      });
+    }
+    return res.status(500).json({ error: 'Failed to fetch DLQ items' });
+  }
 
   const items = data || [];
   const counters = {
@@ -241,7 +325,19 @@ router.get('/dlq/stats', async (_req, res) => {
     .select('queue_name, status, created_at')
     .gte('created_at', since)
     .order('created_at', { ascending: true });
-  if (error) return res.status(500).json({ error: 'Failed to fetch DLQ stats' });
+  if (error) {
+    if (_isMissingOptionalTableError(error, 'dead_letter_queue')) {
+      return res.json({
+        totalLast24h: 0,
+        failedLast24h: 0,
+        retriedLast24h: 0,
+        queueCounts: { whatsapp: 0, email: 0, alert: 0, pdf: 0, other: 0 },
+        hourly: [],
+        degraded: true,
+      });
+    }
+    return res.status(500).json({ error: 'Failed to fetch DLQ stats' });
+  }
 
   const hourlyMap = new Map();
   const queueCounts = { whatsapp: 0, email: 0, alert: 0, pdf: 0, other: 0 };
@@ -383,7 +479,12 @@ router.get('/audit-logs', async (req, res) => {
     }
 
     const { data, error } = await query;
-    if (error) return res.status(500).json({ error: 'Failed to fetch audit logs' });
+    if (error) {
+      if (_isMissingOptionalTableError(error, 'audit_logs')) {
+        return res.json({ items: [], count: 0, nextCursor: null, hasMore: false, degraded: true });
+      }
+      return res.status(500).json({ error: 'Failed to fetch audit logs' });
+    }
     const rows = data || [];
     if (rows.length === 0) {
       reachedEnd = true;
@@ -420,6 +521,49 @@ router.get('/audit-logs', async (req, res) => {
 
 router.get('/telemetry/rate-limit', async (_req, res) => {
   return res.json(getRateLimitTelemetry());
+});
+
+router.get('/telemetry/api-health', async (_req, res) => {
+  const telemetry = getApiTelemetry();
+  const shouldSignal = !(telemetry?.slo?.p95Healthy && telemetry?.slo?.errorRateHealthy);
+  if (shouldSignal) {
+    const now = Date.now();
+    const signalKey = 'security.api_slo_breach';
+    const lastAt = apiSloSignalBuckets.get(signalKey) || 0;
+    if ((now - lastAt) >= apiSloSignalCooldownMs) {
+      apiSloSignalBuckets.set(signalKey, now);
+      const metadata = {
+        severity: 'HIGH',
+        p95Ms: telemetry.p95Ms,
+        p99Ms: telemetry.p99Ms,
+        errorRatePct: telemetry.errorRatePct,
+        totalRequests: telemetry.totalRequests,
+        errors5xx: telemetry.errors5xx,
+        windowMs: telemetry.windowMs,
+        thresholds: telemetry.slo,
+      };
+      await writeAuditLog({
+        actorId: _req.user?.id,
+        actorRole: _req.user?.role,
+        action: 'security.api_slo_breach',
+        entityType: 'api_health',
+        entityId: 'global',
+        metadata,
+      });
+      if (apiSloAlertQueueEnabled) {
+        try {
+          await addJob('alert', 'security-api-slo-breach', {
+            eventType: 'security.api_slo_breach',
+            detectedAt: new Date(now).toISOString(),
+            metadata,
+          });
+        } catch (err) {
+          logger.warn({ err: err.message }, 'Failed to enqueue API SLO breach alert');
+        }
+      }
+    }
+  }
+  return res.json(telemetry);
 });
 
 router.post('/security-signals/:id/ack', async (req, res) => {

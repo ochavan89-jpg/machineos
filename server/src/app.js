@@ -10,6 +10,7 @@ const notificationsRoutes = require('./routes/notifications');
 const walletRoutes = require('./routes/wallet');
 const webhookRoutes = require('./routes/webhook');
 const dlqRoutes = require('./routes/dlq');
+const { apiTelemetryMiddleware } = require('./middleware/apiTelemetry');
 
 function createApp() {
   const app = express();
@@ -17,11 +18,23 @@ function createApp() {
     .split(',')
     .map((origin) => origin.trim())
     .filter(Boolean);
+  const allowedOriginSuffixes = (process.env.CORS_ALLOWED_ORIGIN_SUFFIXES || '')
+    .split(',')
+    .map((suffix) => suffix.trim().toLowerCase())
+    .filter(Boolean);
+  const isAllowedBySuffix = (origin) => {
+    try {
+      const hostname = new URL(origin).hostname.toLowerCase();
+      return allowedOriginSuffixes.some((suffix) => hostname.endsWith(suffix));
+    } catch (_err) {
+      return false;
+    }
+  };
 
   app.use(cors({
     origin(origin, callback) {
       if (!origin) return callback(null, true);
-      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin)) {
+      if (allowedOrigins.length === 0 || allowedOrigins.includes(origin) || isAllowedBySuffix(origin)) {
         return callback(null, true);
       }
       return callback(new Error('Not allowed by CORS'));
@@ -39,6 +52,7 @@ function createApp() {
 
   app.use('/api/webhook/razorpay', express.raw({ type: 'application/json' }));
   app.use(express.json({ limit: '100kb' }));
+  app.use(apiTelemetryMiddleware);
 
   app.get('/', (_req, res) => {
     res.json({
