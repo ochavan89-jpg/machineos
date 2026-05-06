@@ -12,7 +12,7 @@ const useSessionTimeout = () => {
     localStorage.removeItem('machineos_token');
     localStorage.removeItem('machineos_refresh_token');
     alert('Session expired! Please login again.');
-    navigate('/');
+    navigate('/login');
   }, [navigate]);
 
   useEffect(() => {

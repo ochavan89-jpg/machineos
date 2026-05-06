@@ -37,6 +37,24 @@ async function secureFetch(path, options = {}) {
   return payload;
 }
 
+async function fetchAdminPage(endpoint, { limit = 250, offset = 0 } = {}) {
+  try {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+    const result = await secureFetch(`${endpoint}?${params.toString()}`);
+    return {
+      items: result.items || [],
+      hasMore: Boolean(result.hasMore),
+      nextOffset: typeof result.nextOffset === 'number' ? result.nextOffset : null,
+      error: '',
+    };
+  } catch (error) {
+    console.error(error);
+    return { items: [], hasMore: false, nextOffset: null, error: error?.message || `Failed to fetch ${endpoint}` };
+  }
+}
+
 // ─── MACHINES ───
 export const getMachines = async () => {
   try {
@@ -54,6 +72,8 @@ export const getMachines = async () => {
   if (error) { console.error(error); return []; }
   return data;
 };
+
+export const getMachinesPage = async (options = {}) => fetchAdminPage('/api/admin/machines', options);
 
 // ─── BOOKINGS ───
 export const createBooking = async (booking) => {
@@ -90,6 +110,24 @@ export const getBookingsByClient = async (clientId) => {
   }
 };
 
+export const getMyBookingsPage = async ({ limit = 100, offset = 0 } = {}) => {
+  try {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+    const result = await secureFetch(`/api/bookings/me?${params.toString()}`);
+    return {
+      items: result.items || [],
+      hasMore: Boolean(result.hasMore),
+      nextOffset: typeof result.nextOffset === 'number' ? result.nextOffset : null,
+      error: '',
+    };
+  } catch (error) {
+    console.error(error);
+    return { items: [], hasMore: false, nextOffset: null, error: error?.message || 'Failed to fetch bookings' };
+  }
+};
+
 export const getAllBookings = async () => {
   try {
     const result = await secureFetch('/api/admin/bookings');
@@ -99,6 +137,8 @@ export const getAllBookings = async () => {
     return [];
   }
 };
+
+export const getAllBookingsPage = async (options = {}) => fetchAdminPage('/api/admin/bookings', options);
 
 // ─── WALLET ───
 export const getWalletBalance = async (userId) => {
@@ -142,6 +182,8 @@ export const getAllTransactions = async () => {
   }
 };
 
+export const getAllTransactionsPage = async (options = {}) => fetchAdminPage('/api/admin/transactions', options);
+
 // ─── USERS ───
 export const getAllUsers = async () => {
   try {
@@ -152,8 +194,11 @@ export const getAllUsers = async () => {
     return [];
   }
 };
+
+export const getAllUsersPage = async (options = {}) => fetchAdminPage('/api/admin/users', options);
 export const getAllClients = async () => {
   const { data, error } = await supabase
+    .from('users')
     .select('*')
     .eq('role', 'client');
   if (error) { console.error(error); return []; }
@@ -205,6 +250,24 @@ export const getFuelLogs = async (machineId) => {
   }
 };
 
+export const getFuelLogsPage = async ({ limit = 50, offset = 0 } = {}) => {
+  try {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+    const result = await secureFetch(`/api/operator/fuel-logs?${params.toString()}`);
+    return {
+      items: result.items || [],
+      hasMore: Boolean(result.hasMore),
+      nextOffset: typeof result.nextOffset === 'number' ? result.nextOffset : null,
+      error: '',
+    };
+  } catch (error) {
+    console.error(error);
+    return { items: [], hasMore: false, nextOffset: null, error: error?.message || 'Failed to fetch fuel logs' };
+  }
+};
+
 // ─── ATTENDANCE ───
 export const markAttendance = async (attendance) => {
   try {
@@ -230,6 +293,24 @@ export const getAttendanceByOperator = async (operatorId) => {
   } catch (error) {
     console.error(error);
     return [];
+  }
+};
+
+export const getAttendancePage = async ({ limit = 30, offset = 0 } = {}) => {
+  try {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+    const result = await secureFetch(`/api/operator/attendance?${params.toString()}`);
+    return {
+      items: result.items || [],
+      hasMore: Boolean(result.hasMore),
+      nextOffset: typeof result.nextOffset === 'number' ? result.nextOffset : null,
+      error: '',
+    };
+  } catch (error) {
+    console.error(error);
+    return { items: [], hasMore: false, nextOffset: null, error: error?.message || 'Failed to fetch attendance' };
   }
 };
 
@@ -259,6 +340,8 @@ export const getAllIssues = async () => {
     return [];
   }
 };
+
+export const getAllIssuesPage = async (options = {}) => fetchAdminPage('/api/admin/issues', options);
 
 // ─── MACHINE STATUS UPDATE ───
 export const updateMachineStatus = async (machineId, status, fuelLevel) => {
@@ -315,6 +398,24 @@ export const getOwnerBookings = async () => {
   } catch (error) {
     console.error(error);
     return [];
+  }
+};
+
+export const getOwnerBookingsPage = async ({ limit = 100, offset = 0 } = {}) => {
+  try {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+    const result = await secureFetch(`/api/owner/bookings?${params.toString()}`);
+    return {
+      items: result.items || [],
+      hasMore: Boolean(result.hasMore),
+      nextOffset: typeof result.nextOffset === 'number' ? result.nextOffset : null,
+      error: '',
+    };
+  } catch (error) {
+    console.error(error);
+    return { items: [], hasMore: false, nextOffset: null, error: error?.message || 'Failed to fetch owner bookings' };
   }
 };
 
@@ -379,6 +480,22 @@ export const getRateLimitTelemetry = async () => {
     console.error(error);
     return { allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0, error: error?.message || 'Failed to fetch telemetry' };
   }
+};
+
+export const getApiHealthTelemetry = async () => {
+  // Temporarily disabled in production due to endpoint-specific auth mismatch.
+  return {
+    windowMs: 0,
+    totalRequests: 0,
+    errors5xx: 0,
+    errorRatePct: 0,
+    p95Ms: 0,
+    p99Ms: 0,
+    slo: { p95MsThreshold: 0, errorRatePctThreshold: 0, p95Healthy: true, errorRateHealthy: true },
+    byRoute: [],
+    error: '',
+    unavailableReason: 'disabled',
+  };
 };
 
 export const acknowledgeSecuritySignal = async (signalId) => {

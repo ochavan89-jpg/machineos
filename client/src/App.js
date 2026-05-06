@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { LanguageProvider } from './context/LanguageContext';
+import MarketingPage from './pages/MarketingPage';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import OwnerDashboard from './pages/OwnerDashboard';
@@ -11,14 +12,24 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:500
 
 function ProtectedRoute({ role, children, authReady, user }) {
   const token = localStorage.getItem('machineos_token');
+  // `user` state हे App mount झाल्यावरच fetch होत असल्याने login नंतर ते null राहू शकते.
+  // म्हणून localStorage मधून user पुन्हा वाचून route guard योग्यरित्या लागू करतो.
+  let storedUser = user;
+  if (!storedUser) {
+    try {
+      storedUser = JSON.parse(localStorage.getItem('machineos_user') || 'null');
+    } catch (_err) {
+      storedUser = null;
+    }
+  }
   if (!authReady) {
     return <div style={{ color: '#c9a84c', textAlign: 'center', paddingTop: '20vh' }}>Validating session...</div>;
   }
-  if (!token || !user?.role) {
-    return <Navigate to="/" replace />;
+  if (!token || !storedUser?.role) {
+    return <Navigate to="/login" replace />;
   }
-  if (role && user.role !== role) {
-    return <Navigate to="/" replace />;
+  if (role && storedUser.role !== role) {
+    return <Navigate to={`/${storedUser.role}`} replace />;
   }
   return children;
 }
@@ -89,12 +100,13 @@ function App() {
     <LanguageProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<Login />} />
+          <Route path="/" element={<MarketingPage />} />
+          <Route path="/login" element={<Login />} />
           <Route path="/admin" element={<ProtectedRoute role="admin" authReady={authReady} user={sessionUser}><AdminDashboard /></ProtectedRoute>} />
           <Route path="/owner" element={<ProtectedRoute role="owner" authReady={authReady} user={sessionUser}><OwnerDashboard /></ProtectedRoute>} />
           <Route path="/client" element={<ProtectedRoute role="client" authReady={authReady} user={sessionUser}><ClientDashboard /></ProtectedRoute>} />
           <Route path="/operator" element={<ProtectedRoute role="operator" authReady={authReady} user={sessionUser}><OperatorDashboard /></ProtectedRoute>} />
-          <Route path="*" element={<Navigate to="/" />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </LanguageProvider>

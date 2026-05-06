@@ -2,7 +2,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
-const RS = 'Rs.';
+const RS = 'INR';
 const C = {
   navy:   [10, 22, 40],
   gold:   [201, 168, 76],
@@ -34,6 +34,13 @@ const COMPANY = {
 
 function money(n) { return `${RS} ${Number(n).toLocaleString('en-IN')}`; }
 function pct(n, p) { return Math.round(n * p / 100); }
+function safeFilePart(value, fallback) {
+  return String(value || fallback || 'Report')
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, '')
+    .replace(/\s+/g, '_')
+    .slice(0, 60);
+}
 
 function drawHeader(doc, title, sub) {
   const W = doc.internal.pageSize.getWidth();
@@ -604,7 +611,18 @@ export function generateBookingReport(bookings, clientName) {
       6: { halign: 'right' },
       7: { halign: 'right', fontStyle: 'bold' },
     },
-    margin: { left: 10, right: 10 },
+    margin: { left: 10, right: 10, bottom: 18 },
+    didDrawPage: (data) => {
+      const pageNumber = doc.internal.getCurrentPageInfo().pageNumber;
+      doc.setTextColor(...C.gray);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(7);
+      doc.text(
+        `Page ${pageNumber} | Generated ${new Date().toLocaleString('en-IN')}`,
+        data.settings.margin.left,
+        doc.internal.pageSize.getHeight() - 6
+      );
+    },
     didParseCell: (data) => {
       if (data.section === 'body' && data.column.index === 8) {
         const st = data.cell.raw;
@@ -616,5 +634,5 @@ export function generateBookingReport(bookings, clientName) {
   });
 
   drawFooter(doc, 'Booking History Report');
-  doc.save(`DE_Booking_Report_${(clientName || 'Client').replace(/\s/g, '_')}.pdf`);
+  doc.save(`DE_Booking_Report_${safeFilePart(clientName, 'Client')}.pdf`);
 }

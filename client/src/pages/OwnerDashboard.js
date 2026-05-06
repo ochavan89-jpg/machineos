@@ -3,12 +3,13 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSessionTimeout from '../hooks/useSessionTimeout';
 import { useLanguage } from '../context/LanguageContext';
-// import LanguageSelector from '../components/LanguageSelector';
+import LanguageSelector from '../components/LanguageSelector';
 import { generateOwnerReceipt } from '../services/pdfGenerator';
 import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
-import { getOwnerBookings, approveBooking } from '../supabaseService';
+import { getOwnerBookingsPage, approveBooking } from '../supabaseService';
 import { getMachines, getAllBookings } from '../supabaseService';
+import { appendUniqueById } from '../utils/pagination';
 
 const OWNER_DATA = {
   name: 'Rajesh Patil',
@@ -42,14 +43,14 @@ const ALERTS = [
 ];
 
 const NAV = [
-  { id: 'dashboard', icon: String.fromCodePoint(0x1F4CA), label: 'Dashboard' },
-  { id: 'bookings', icon: String.fromCodePoint(0x1F4CB), label: 'Bookings' },
-  { id: 'machines', icon: String.fromCodePoint(0x1F69C), label: 'My Machines' },
-  { id: 'register', icon: String.fromCodePoint(0x1F4DD), label: 'Register Machine' },
-  { id: 'tracking', icon: String.fromCodePoint(0x1F4CD), label: 'GPS Tracking' },
-  { id: 'reports', icon: String.fromCodePoint(0x1F4B0), label: 'Reports & Pay' },
-  { id: 'alerts', icon: String.fromCodePoint(0x1F514), label: 'Alerts' },
-  { id: 'support', icon: String.fromCodePoint(0x1F198), label: 'Support' },
+  { id: 'dashboard', icon: String.fromCodePoint(0x1F4CA), label: 'Dashboard', i18nKey: 'dashboard' },
+  { id: 'bookings', icon: String.fromCodePoint(0x1F4CB), label: 'Bookings', i18nKey: 'myBookings' },
+  { id: 'machines', icon: String.fromCodePoint(0x1F69C), label: 'My Machines', i18nKey: 'myMachines' },
+  { id: 'register', icon: String.fromCodePoint(0x1F4DD), label: 'Register Machine', i18nKey: 'register' },
+  { id: 'tracking', icon: String.fromCodePoint(0x1F4CD), label: 'GPS Tracking', i18nKey: 'tracking' },
+  { id: 'reports', icon: String.fromCodePoint(0x1F4B0), label: 'Reports & Pay', i18nKey: 'reports' },
+  { id: 'alerts', icon: String.fromCodePoint(0x1F514), label: 'Alerts', i18nKey: 'alerts' },
+  { id: 'support', icon: String.fromCodePoint(0x1F198), label: 'Support', i18nKey: 'support' },
 
 ];
 const OwnerMonthAccordion = ({ month, days, isSmall, s, setOwnerBookings, ownerBookings }) => {
@@ -91,7 +92,7 @@ const OwnerMonthAccordion = ({ month, days, isSmall, s, setOwnerBookings, ownerB
                             <span style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', color: '#c9a84c', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>{b.booking_ref}</span>
                             <span style={{ marginLeft: '8px', color: '#8896a8', fontSize: '11px' }}>{t.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span>
                           </div>
-                          <span style={{ background: b.owner_approved ? 'rgba(76,175,80,0.15)' : 'rgba(255,152,0,0.15)', border: b.owner_approved ? '1px solid #4CAF50' : '1px solid #FF9800', color: b.owner_approved ? '#4CAF50' : '#FF9800', padding: '3px 10px', borderRadius: '20px', fontSize: '11px' }}>{b.owner_approved ? String.fromCodePoint(0x2705) + ' Approved' : String.fromCodePoint(0x23F3) + ' Pending'}</span>
+                          <span style={{ background: b.owner_approved ? 'rgba(76,175,80,0.15)' : 'rgba(255,152,0,0.15)', border: b.owner_approved ? '1px solid #4CAF50' : '1px solid #FF9800', color: b.owner_approved ? '#4CAF50' : '#FF9800', padding: '3px 10px', borderRadius: '20px', fontSize: '11px' }}>{b.owner_approved ? `${String.fromCodePoint(0x2705)} ${t('approved')}` : `${String.fromCodePoint(0x23F3)} ${t('pending')}`}</span>
                         </div>
                         <div style={{ display: 'grid', gridTemplateColumns: isSmall ? 'repeat(2,1fr)' : 'repeat(3,1fr)', gap: '8px', marginBottom: '12px' }}>
                           {[
@@ -113,9 +114,9 @@ const OwnerMonthAccordion = ({ month, days, isSmall, s, setOwnerBookings, ownerB
                             onClick={async () => {
                               await approveBooking(b.id);
                               setOwnerBookings(prev => prev.map(x => x.id === b.id ? { ...x, owner_approved: true } : x));
-                              alert('Approved! Machine dispatched.');
+                              alert(`${t('approved')}! ${t('dispatched')}.`);
                             }}>
-                            {String.fromCodePoint(0x2705)} Approve & Dispatch Machine
+                            {String.fromCodePoint(0x2705)} {t('approveAndDispatch')}
                           </button>
                         )}
                         {b.owner_approved && b.owner_approved_at && (
@@ -141,12 +142,16 @@ const OwnerDashboard = () => {
   const navigate = useNavigate();
   useSessionTimeout();
   const { t } = useLanguage(); // eslint-disable-line
+  const navItems = NAV.map((item) => ({ ...item, label: item.i18nKey ? t(item.i18nKey) : item.label }));
   const { isMobile, isTablet } = useWindowSize();
   const isSmall = isMobile || isTablet;
 
   const [activeTab, setActiveTab] = useState('dashboard');
   const [regStep, setRegStep] = useState(1);
   const [ownerBookings, setOwnerBookings] = useState([]);
+  const [ownerBookingsOffset, setOwnerBookingsOffset] = useState(0);
+  const [ownerBookingsHasMore, setOwnerBookingsHasMore] = useState(false);
+  const [ownerBookingsLoadingMore, setOwnerBookingsLoadingMore] = useState(false);
   const [regData, setRegData] = useState({
     ownerName: OWNER_DATA.name, ownerPhone: OWNER_DATA.phone, ownerEmail: OWNER_DATA.email,
     machineName: '', machineType: '', regNo: '', year: '', capacity: '',
@@ -161,13 +166,31 @@ const OwnerDashboard = () => {
   useEffect(() => {
     const loadData = async () => {
       const machines = await getMachines();
+      setMachineData(machines || []);
       // eslint-disable-next-line no-unused-vars
       const bookings = await getAllBookings();
       // setBookingData(bookings);
     };
     loadData();
-    getOwnerBookings().then(setOwnerBookings);
+    getOwnerBookingsPage({ limit: 100, offset: 0 }).then((result) => {
+      setOwnerBookings(result.items || []);
+      setOwnerBookingsHasMore(Boolean(result.hasMore));
+      setOwnerBookingsOffset(result.nextOffset || 0);
+    });
   }, []);
+  const loadMoreOwnerBookings = async () => {
+    if (!ownerBookingsHasMore || ownerBookingsLoadingMore) return;
+    setOwnerBookingsLoadingMore(true);
+    const result = await getOwnerBookingsPage({ limit: 100, offset: ownerBookingsOffset });
+    if ((result.items || []).length > 0) {
+      setOwnerBookings((prev) => appendUniqueById(prev, result.items));
+      setOwnerBookingsOffset(result.nextOffset || ownerBookingsOffset);
+      setOwnerBookingsHasMore(Boolean(result.hasMore));
+    } else {
+      setOwnerBookingsHasMore(false);
+    }
+    setOwnerBookingsLoadingMore(false);
+  };
 
   
   const displayMachines = machineData.length > 0 ? machineData.map(m => ({
@@ -184,11 +207,11 @@ const OwnerDashboard = () => {
       {/* Mobile Nav */}
       {isSmall && (
         <MobileNav
-          navItems={NAV}
+          navItems={navItems}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
-          title="Development Express"
-          subtitle="Owner Portal"
+          title={t('appName')}
+          subtitle={t('ownerPortal')}
           topContent={
             <div style={{ padding: '4px 0' }}>
               <p style={{ color: '#c9a84c', fontWeight: '700', fontSize: '13px', margin: '0 0 2px' }}>{OWNER_DATA.name}</p>
@@ -196,7 +219,7 @@ const OwnerDashboard = () => {
             </div>
           }
           bottomContent={
-            <button style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(233,69,96,0.3)', background: 'rgba(233,69,96,0.08)', color: '#e94560', cursor: 'pointer', fontSize: '13px', width: '100%' }} onClick={() => navigate('/')}>🚪 Logout</button>
+            <button style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(233,69,96,0.3)', background: 'rgba(233,69,96,0.08)', color: '#e94560', cursor: 'pointer', fontSize: '13px', width: '100%' }} onClick={() => navigate('/')}>🚪 {t('logout')}</button>
           }
         />
       )}
@@ -207,8 +230,8 @@ const OwnerDashboard = () => {
           <div style={s.sidebarLogo}>
             <div style={s.logoCircle}>DE</div>
             <div>
-              <p style={s.logoTitle}>Development Express</p>
-              <p style={s.logoSub}>Owner Portal</p>
+              <p style={s.logoTitle}>{t('appName')}</p>
+              <p style={s.logoSub}>{t('ownerPortal')}</p>
             </div>
           </div>
           <div style={s.divider} />
@@ -220,14 +243,14 @@ const OwnerDashboard = () => {
             </div>
           </div>
           <div style={s.divider} />
-          {NAV.map(item => (
+          {navItems.map(item => (
             <button key={item.id} style={activeTab === item.id ? s.navActive : s.nav} onClick={() => setActiveTab(item.id)}>
               <span>{item.icon}</span><span>{item.label}</span>
             </button>
           ))}
           <div style={s.divider} />
-          <button style={s.logoutBtn} onClick={() => navigate('/')}>🚪 Logout</button>
-          <p style={s.sidebarFooter}>Since 2011 · 15 Yrs Excellence</p>
+          <button style={s.logoutBtn} onClick={() => navigate('/')}>🚪 {t('logout')}</button>
+          <p style={s.sidebarFooter}>{t('sinceExcellence')}</p>
         </div>
       )}
 
@@ -236,14 +259,14 @@ const OwnerDashboard = () => {
         {/* Header */}
         <div style={{ ...s.header, flexDirection: isSmall ? 'column' : 'row', gap: isSmall ? '8px' : '0' }}>
           <div>
-            <button style={{ background:'rgba(201,168,76,0.08)', border:'1px solid rgba(201,168,76,0.2)', color:'#c9a84c', borderRadius:'20px', padding:'5px 12px 5px 8px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px', display:'flex', alignItems:'center', gap:'5px', width:'fit-content' }} onClick={() => { const tabs=NAV.map(n=>n.id); const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>&#8592;</button>
+            <button style={{ background:'rgba(201,168,76,0.08)', border:'1px solid rgba(201,168,76,0.2)', color:'#c9a84c', borderRadius:'20px', padding:'5px 12px 5px 8px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px', display:'flex', alignItems:'center', gap:'5px', width:'fit-content' }} onClick={() => { const tabs=navItems.map(n=>n.id); const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>&#8592;</button>
             <h2 style={{ ...s.pageTitle, fontSize: isSmall ? '16px' : '20px' }}>
-              {NAV.find(n => n.id === activeTab)?.icon}{' '}{NAV.find(n => n.id === activeTab)?.label}
+              {navItems.find(n => n.id === activeTab)?.icon}{' '}{navItems.find(n => n.id === activeTab)?.label}
             </h2>
             <p style={s.pageDate}>📅 {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</p>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            
+            <LanguageSelector compact={true} />
             {!isSmall && (
               <div style={s.ownerBadge}>
                 <span style={s.onlineDot}></span>
@@ -259,8 +282,8 @@ const OwnerDashboard = () => {
             <div style={{ display: 'grid', gridTemplateColumns: isSmall ? 'repeat(2,1fr)' : 'repeat(3,1fr)', gap: '12px', marginBottom: '20px' }}>
               {[
                 { icon: String.fromCodePoint(0x1F4CB), val: ownerBookings.length.toString(), label: 'Total Bookings' },
-                { icon: String.fromCodePoint(0x23F3), val: ownerBookings.filter(b => !b.owner_approved).length.toString(), label: 'Pending Approval' },
-                { icon: String.fromCodePoint(0x2705), val: ownerBookings.filter(b => b.owner_approved).length.toString(), label: 'Approved' },
+                { icon: String.fromCodePoint(0x23F3), val: ownerBookings.filter(b => !b.owner_approved).length.toString(), label: t('pendingApproval') },
+                { icon: String.fromCodePoint(0x2705), val: ownerBookings.filter(b => b.owner_approved).length.toString(), label: t('approved') },
               ].map((c, i) => (
                 <div key={i} style={s.card}><p style={{ fontSize: '22px', margin: '0 0 6px' }}>{c.icon}</p><h3 style={{ color: '#c9a84c', fontSize: '20px', fontWeight: '700', margin: '0 0 4px' }}>{c.val}</h3><p style={{ color: '#8896a8', fontSize: '11px', margin: 0 }}>{c.label}</p></div>
               ))}
@@ -279,6 +302,20 @@ const OwnerDashboard = () => {
                 <OwnerMonthAccordion key={month} month={month} days={days} isSmall={isSmall} s={s} setOwnerBookings={setOwnerBookings} ownerBookings={ownerBookings} />
               ));
                         })()}
+            {ownerBookingsHasMore && (
+              <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+                <button
+                  style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '8px', padding: '8px 14px', cursor: ownerBookingsLoadingMore ? 'wait' : 'pointer', opacity: ownerBookingsLoadingMore ? 0.7 : 1 }}
+                  disabled={ownerBookingsLoadingMore}
+                  onClick={loadMoreOwnerBookings}
+                >
+                  {ownerBookingsLoadingMore ? t('loading') : t('loadMoreBookings')}
+                </button>
+              </div>
+            )}
+            <p style={{ color: '#8896a8', fontSize: '11px', textAlign: 'center', margin: '8px 0 0' }}>
+              Loaded {ownerBookings.length} owner bookings{ownerBookingsHasMore ? ' (more available)' : ' (all loaded)'}
+            </p>
           </div>
         )}
         {activeTab === 'dashboard' && (
@@ -318,7 +355,7 @@ const OwnerDashboard = () => {
 
             {/* Machine Status */}
             <div style={s.tableCard}>
-              <h3 style={s.tableTitle}>🚜 Machine Status</h3>
+              <h3 style={s.tableTitle}>🚜 {t('machineStatusTitle')}</h3>
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ ...s.table, minWidth: '500px' }}>
                   <thead><tr>{['Machine', 'Status', 'Client', 'Fuel', 'HMR', 'Revenue'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
@@ -343,7 +380,7 @@ const OwnerDashboard = () => {
 
             {/* Alerts */}
             <div style={s.tableCard}>
-              <h3 style={s.tableTitle}>🔔 Recent Alerts</h3>
+              <h3 style={s.tableTitle}>🔔 {t('recentAlerts')}</h3>
               {ALERTS.map((a, i) => (
                 <div key={i} style={{ ...s.alertRow, borderLeft: `3px solid ${a.color}` }}>
                   <span style={{ fontSize: '18px' }}>{a.icon}</span>
@@ -398,7 +435,7 @@ const OwnerDashboard = () => {
         {/* ═══ TAB: REGISTER MACHINE ═══ */}
         {activeTab === 'register' && (
           <div style={s.tableCard}>
-            <h3 style={s.tableTitle}>📝 Machine Registration</h3>
+            <h3 style={s.tableTitle}>📝 {t('machineRegistrationTitle')}</h3>
 
             {/* Steps */}
             <div style={{ display: 'flex', gap: '6px', marginBottom: '20px', overflowX: 'auto' }}>
@@ -500,11 +537,11 @@ const OwnerDashboard = () => {
 
             {/* Navigation Buttons */}
             <div style={{ display: 'flex', gap: '10px', marginTop: '20px' }}>
-              {regStep > 1 && <button style={s.cancelBtn} onClick={() => setRegStep(s => s - 1)}>← मागे</button>}
+              {regStep > 1 && <button style={s.cancelBtn} onClick={() => setRegStep(s => s - 1)}>← {t('back')}</button>}
               {regStep < 5 ? (
-                <button style={{ ...s.confirmBtn, flex: 1 }} onClick={() => setRegStep(s => s + 1)}>पुढे →</button>
+                <button style={{ ...s.confirmBtn, flex: 1 }} onClick={() => setRegStep(s => s + 1)}>{t('nextText')} →</button>
               ) : (
-                <button style={{ ...s.confirmBtn, flex: 1, opacity: regData.agreed ? 1 : 0.5 }} disabled={!regData.agreed} onClick={() => alert('✅ Machine Registration Submitted! DE Team will verify within 24 hrs.')}>
+                <button style={{ ...s.confirmBtn, flex: 1, opacity: regData.agreed ? 1 : 0.5 }} disabled={!regData.agreed} onClick={() => alert(`${String.fromCodePoint(0x2705)} ${t('machineRegistrationSubmitted')}`)}>
                   ✅ Registration Submit करा
                 </button>
               )}
@@ -571,7 +608,7 @@ const OwnerDashboard = () => {
 
             <div style={s.tableCard}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
-                <h3 style={s.tableTitle}>💳 Payment History</h3>
+                <h3 style={s.tableTitle}>💳 {t('paymentHistoryTitle')}</h3>
                 <button style={s.downloadBtn} onClick={() => generateOwnerReceipt({
                   receiptNo: 'DE/RCPT/OWN/2026/041001',
                   bookingId: 'BK-2026-041001',
@@ -634,7 +671,7 @@ const OwnerDashboard = () => {
         {/* ═══ TAB: ALERTS ═══ */}
         {activeTab === 'alerts' && (
           <div style={s.tableCard}>
-            <h3 style={s.tableTitle}>🔔 All Alerts</h3>
+            <h3 style={s.tableTitle}>🔔 {t('allAlerts')}</h3>
             {[...ALERTS,
               { icon: '🔧', msg: 'JCB-001 — Scheduled Maintenance Due', time: '1 day ago', color: '#c9a84c' },
               { icon: '📋', msg: 'Monthly Report Ready — April 2026', time: '2 days ago', color: '#4CAF50' },
@@ -654,12 +691,12 @@ const OwnerDashboard = () => {
         {activeTab === 'support' && (
           <div>
             <div style={{ ...s.tableCard, marginBottom: '15px' }}>
-              <h3 style={s.tableTitle}>🆘 Contact Development Express</h3>
+              <h3 style={s.tableTitle}>🆘 {t('contactCompany')}</h3>
               <div style={{ display: 'grid', gridTemplateColumns: isSmall ? '1fr' : 'repeat(2, 1fr)', gap: '12px' }}>
                 <a href="tel:+919766926636" style={{ textDecoration: 'none' }}>
                   <div style={{ background: 'rgba(76,175,80,0.1)', border: '1px solid rgba(76,175,80,0.3)', borderRadius: '10px', padding: '16px', textAlign: 'center', cursor: 'pointer' }}>
                     <p style={{ fontSize: '28px', margin: '0 0 8px' }}>📞</p>
-                    <p style={{ color: '#4CAF50', fontWeight: '700', fontSize: '14px', margin: '0 0 4px' }}>Call Now</p>
+                    <p style={{ color: '#4CAF50', fontWeight: '700', fontSize: '14px', margin: '0 0 4px' }}>{t('callNow')}</p>
                     <p style={{ color: '#8896a8', fontSize: '12px', margin: 0 }}>+91-9766926636</p>
                   </div>
                 </a>
@@ -679,7 +716,7 @@ const OwnerDashboard = () => {
                 </a>
                 <div style={{ background: 'rgba(21,101,192,0.1)', border: '1px solid rgba(21,101,192,0.3)', borderRadius: '10px', padding: '16px', textAlign: 'center', cursor: 'pointer' }}>
                   <p style={{ fontSize: '28px', margin: '0 0 8px' }}>📍</p>
-                  <p style={{ color: '#1565C0', fontWeight: '700', fontSize: '14px', margin: '0 0 4px' }}>Office</p>
+                  <p style={{ color: '#1565C0', fontWeight: '700', fontSize: '14px', margin: '0 0 4px' }}>{t('officeLabel')}</p>
                   <p style={{ color: '#8896a8', fontSize: '12px', margin: 0 }}>Karad, Satara - 415110</p>
                 </div>
               </div>

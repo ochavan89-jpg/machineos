@@ -1,13 +1,29 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 
 const LanguageSelector = ({ compact = false }) => {
   const { lang, setLang, LANGUAGES } = useLanguage();
   const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
   const current = LANGUAGES.find(l => l.code === lang);
+  useEffect(() => {
+    const onPointerDown = (event) => {
+      if (!rootRef.current) return;
+      if (!rootRef.current.contains(event.target)) setOpen(false);
+    };
+    const onEsc = (event) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('keydown', onEsc);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, []);
 
   return (
-    <div style={{ position: 'relative', zIndex: 1000 }}>
+    <div ref={rootRef} style={{ position: 'relative', zIndex: 1000 }}>
       <button
         style={{
           display: 'flex', alignItems: 'center', gap: '8px',

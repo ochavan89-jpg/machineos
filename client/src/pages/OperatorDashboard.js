@@ -4,7 +4,8 @@ import useSessionTimeout from '../hooks/useSessionTimeout';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageSelector from '../components/LanguageSelector';
 import { useWindowSize } from '../hooks/useWindowSize';
-import { markAttendance, addFuelLog, reportIssue, getAttendanceByOperator, getFuelLogs } from '../supabaseService';
+import { markAttendance, addFuelLog, reportIssue, getAttendancePage, getFuelLogsPage } from '../supabaseService';
+import { appendUniqueById } from '../utils/pagination';
 
 const OPERATOR = {
   name: 'Ramesh Kadam',
@@ -20,12 +21,12 @@ const OPERATOR = {
 };
 
 const NAV = [
-  { id: 'home', icon: String.fromCodePoint(0x1F3E0), label: 'Home' },
-  { id: 'attendance', icon: String.fromCodePoint(0x2705), label: 'Attendance' },
-  { id: 'machinelog', icon: String.fromCodePoint(0x1F69C), label: 'Machine Log' },
-  { id: 'fuel', icon: String.fromCodePoint(0x26FD), label: 'Fuel' },
-  { id: 'daily', icon: String.fromCodePoint(0x1F4CB), label: 'Reports' },
-  { id: 'issues', icon: String.fromCodePoint(0x26A0), label: 'Issues' },
+  { id: 'home', icon: String.fromCodePoint(0x1F3E0), label: 'Home', i18nKey: 'home' },
+  { id: 'attendance', icon: String.fromCodePoint(0x2705), label: 'Attendance', i18nKey: 'attendance' },
+  { id: 'machinelog', icon: String.fromCodePoint(0x1F69C), label: 'Machine Log', i18nKey: 'machineLog' },
+  { id: 'fuel', icon: String.fromCodePoint(0x26FD), label: 'Fuel', i18nKey: 'fuel' },
+  { id: 'daily', icon: String.fromCodePoint(0x1F4CB), label: 'Reports', i18nKey: 'reports' },
+  { id: 'issues', icon: String.fromCodePoint(0x26A0), label: 'Issues', i18nKey: 'issues' },
 ];
 
 const attendanceHistory = [
@@ -60,6 +61,7 @@ const OperatorDashboard = () => {
   const navigate = useNavigate();
   useSessionTimeout();
   const { t } = useLanguage(); // eslint-disable-line
+  const navItems = NAV.map((item) => ({ ...item, label: item.i18nKey ? t(item.i18nKey) : item.label }));
   const { isMobile, isTablet } = useWindowSize();
   const isSmall = isMobile || isTablet;
 
@@ -84,6 +86,12 @@ const OperatorDashboard = () => {
   const [issueNote, setIssueNote] = useState('');
   const [attendanceRows, setAttendanceRows] = useState(attendanceHistory);
   const [fuelRows, setFuelRows] = useState(fuelHistory);
+  const [attendanceOffset, setAttendanceOffset] = useState(0);
+  const [attendanceHasMore, setAttendanceHasMore] = useState(false);
+  const [attendanceLoadingMore, setAttendanceLoadingMore] = useState(false);
+  const [fuelOffset, setFuelOffset] = useState(0);
+  const [fuelHasMore, setFuelHasMore] = useState(false);
+  const [fuelLoadingMore, setFuelLoadingMore] = useState(false);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -94,8 +102,9 @@ const OperatorDashboard = () => {
     const user = JSON.parse(localStorage.getItem('machineos_user') || '{}');
     if (!user?.id) return;
 
-    getAttendanceByOperator(user.id).then((rows) => {
-      if (rows && rows.length > 0) {
+    getAttendancePage({ limit: 30, offset: 0 }).then((result) => {
+      const rows = result.items || [];
+      if (rows.length > 0) {
         setAttendanceRows(rows.map((r) => ({
           date: r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '-',
           day: r.date ? new Date(r.date).toLocaleDateString('en-IN', { weekday: 'long' }) : '-',
@@ -105,10 +114,13 @@ const OperatorDashboard = () => {
           hmr: r.hmr || 0,
         })));
       }
+      setAttendanceHasMore(Boolean(result.hasMore));
+      setAttendanceOffset(result.nextOffset || 0);
     });
 
-    getFuelLogs(user.id).then((rows) => {
-      if (rows && rows.length > 0) {
+    getFuelLogsPage({ limit: 50, offset: 0 }).then((result) => {
+      const rows = result.items || [];
+      if (rows.length > 0) {
         setFuelRows(rows.map((r) => ({
           date: r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '-',
           time: r.created_at ? new Date(r.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '-',
@@ -118,8 +130,56 @@ const OperatorDashboard = () => {
           by: 'Operator',
         })));
       }
+      setFuelHasMore(Boolean(result.hasMore));
+      setFuelOffset(result.nextOffset || 0);
     });
   }, []);
+  const loadMoreAttendance = async () => {
+    if (!attendanceHasMore || attendanceLoadingMore) return;
+    setAttendanceLoadingMore(true);
+    const result = await getAttendancePage({ limit: 30, offset: attendanceOffset });
+    const rows = result.items || [];
+    if (rows.length > 0) {
+      const mapped = rows.map((r) => ({
+        id: r.id,
+        date: r.date ? new Date(r.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '-',
+        day: r.date ? new Date(r.date).toLocaleDateString('en-IN', { weekday: 'long' }) : '-',
+        status: r.status === 'present' ? 'Present' : r.status === 'halfday' ? 'Half Day' : 'Absent',
+        checkIn: r.check_in || '-',
+        checkOut: r.check_out || '-',
+        hmr: r.hmr || 0,
+      }));
+      setAttendanceRows((prev) => appendUniqueById(prev, mapped));
+      setAttendanceOffset(result.nextOffset || attendanceOffset);
+      setAttendanceHasMore(Boolean(result.hasMore));
+    } else {
+      setAttendanceHasMore(false);
+    }
+    setAttendanceLoadingMore(false);
+  };
+  const loadMoreFuelLogs = async () => {
+    if (!fuelHasMore || fuelLoadingMore) return;
+    setFuelLoadingMore(true);
+    const result = await getFuelLogsPage({ limit: 50, offset: fuelOffset });
+    const rows = result.items || [];
+    if (rows.length > 0) {
+      const mapped = rows.map((r) => ({
+        id: r.id,
+        date: r.created_at ? new Date(r.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) : '-',
+        time: r.created_at ? new Date(r.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '-',
+        level: r.fuel_level || 0,
+        change: 0,
+        note: r.note || 'Fuel update',
+        by: 'Operator',
+      }));
+      setFuelRows((prev) => appendUniqueById(prev, mapped));
+      setFuelOffset(result.nextOffset || fuelOffset);
+      setFuelHasMore(Boolean(result.hasMore));
+    } else {
+      setFuelHasMore(false);
+    }
+    setFuelLoadingMore(false);
+  };
 
   const handleAttendance = async (type) => {
     const user = JSON.parse(localStorage.getItem('machineos_user') || '{}');
@@ -156,7 +216,7 @@ const OperatorDashboard = () => {
     setLogs(prev => [{ type: 'issue', time: now, note: '[' + issueType + '] ' + issueNote, fuel: fuelLevel }, ...prev]);
     if (user?.id) await reportIssue({ operator_id: user.id, issue_type: issueType, description: issueNote, status: 'Pending', created_at: new Date().toISOString() });
     setIssueType(''); setIssueNote(''); setShowIssueModal(false);
-    alert('Issue reported successfully!');
+    alert(t('issueReportedSuccess'));
   };
 
   const logIcon = (type) => {
@@ -165,7 +225,7 @@ const OperatorDashboard = () => {
   };
 
   const fuelColor = fuelLevel > 50 ? '#4CAF50' : fuelLevel > 25 ? '#FF9800' : '#e94560';
-  const currentNavItem = NAV.find(n => n.id === activeTab);
+  const currentNavItem = navItems.find(n => n.id === activeTab);
 
   return (
     <div style={s.container}>
@@ -178,8 +238,8 @@ const OperatorDashboard = () => {
             <div style={s.topBarLeft}>
               <div style={s.topLogoCircle}>DE</div>
               <div>
-                <p style={s.topTitle}>Development Express</p>
-                <p style={s.topSub}>Operator Portal</p>
+                <p style={s.topTitle}>{t('appName')}</p>
+                <p style={s.topSub}>{t('operatorPortal')}</p>
               </div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -209,7 +269,7 @@ const OperatorDashboard = () => {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: machineStarted ? '#4CAF50' : '#FF9800', display: 'inline-block' }}></span>
                     <span style={{ color: '#c9a84c', fontSize: '12px', fontWeight: '700' }}>{OPERATOR.machineId}</span>
-                    <span style={{ color: machineStarted ? '#4CAF50' : '#FF9800', fontSize: '11px' }}>{machineStarted ? 'Running' : 'Stopped'}</span>
+                    <span style={{ color: machineStarted ? '#4CAF50' : '#FF9800', fontSize: '11px' }}>{machineStarted ? t('running') : t('stopped')}</span>
                   </div>
                   <span style={{ color: fuelColor, fontSize: '12px', fontWeight: '700' }}>{String.fromCodePoint(0x26FD)} {fuelLevel}%</span>
                 </div>
@@ -218,7 +278,7 @@ const OperatorDashboard = () => {
 
                 {/* Nav Items */}
                 <div style={{ padding: '8px', flex: 1, overflowY: 'auto' }}>
-                  {NAV.map(item => (
+                  {navItems.map(item => (
                     <button key={item.id}
                       style={activeTab === item.id ? s.drawerNavActive : s.drawerNav}
                       onClick={() => { setActiveTab(item.id); setMenuOpen(false); }}>
@@ -234,7 +294,7 @@ const OperatorDashboard = () => {
                 {/* Logout */}
                 <div style={{ padding: '12px 16px' }}>
                   <button style={s.drawerLogout} onClick={() => navigate('/')}>
-                    🚪 Logout
+                    🚪 {t('logout')}
                   </button>
                 </div>
               </div>
@@ -243,7 +303,7 @@ const OperatorDashboard = () => {
 
           {/* Bottom Nav */}
           <div style={s.bottomNav}>
-            {NAV.slice(0, 6).map(item => (
+            {navItems.slice(0, 6).map(item => (
               <button key={item.id}
                 style={{ ...s.bottomNavItem, color: activeTab === item.id ? '#c9a84c' : '#556070' }}
                 onClick={() => setActiveTab(item.id)}>
@@ -262,8 +322,8 @@ const OperatorDashboard = () => {
           <div style={s.sidebarLogo}>
             <div style={s.logoCircle}>DE</div>
             <div>
-              <p style={s.logoTitle}>Development Express</p>
-              <p style={s.logoSub}>Operator Portal</p>
+              <p style={s.logoTitle}>{t('appName')}</p>
+              <p style={s.logoSub}>{t('operatorPortal')}</p>
             </div>
           </div>
           <div style={s.divider} />
@@ -275,7 +335,7 @@ const OperatorDashboard = () => {
             </div>
           </div>
           <div style={s.divider} />
-          {NAV.map(item => (
+          {navItems.map(item => (
             <button key={item.id} style={activeTab === item.id ? s.navActive : s.nav} onClick={() => setActiveTab(item.id)}>
               <span style={{ fontSize: '16px' }}>{item.icon}</span>
               <span>{item.label}</span>
@@ -286,12 +346,12 @@ const OperatorDashboard = () => {
             <p style={s.msLabel}>{String.fromCodePoint(0x1F69C)} {OPERATOR.machineId}</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span style={{ ...s.statusDot, background: machineStarted ? '#4CAF50' : '#FF9800' }}></span>
-              <span style={{ color: machineStarted ? '#4CAF50' : '#FF9800', fontSize: '11px', fontWeight: '700' }}>{machineStarted ? 'Running' : 'Stopped'}</span>
+              <span style={{ color: machineStarted ? '#4CAF50' : '#FF9800', fontSize: '11px', fontWeight: '700' }}>{machineStarted ? t('running') : t('stopped')}</span>
             </div>
             <p style={{ ...s.msLabel, color: fuelColor }}>{String.fromCodePoint(0x26FD)} Fuel: {fuelLevel}%</p>
           </div>
-          <button style={s.logoutBtn} onClick={() => navigate('/')}>🚪 Logout</button>
-          <p style={s.sidebarFooter}>Since 2011 � 15 Yrs Excellence</p>
+          <button style={s.logoutBtn} onClick={() => navigate('/')}>🚪 {t('logout')}</button>
+          <p style={s.sidebarFooter}>{t('sinceExcellence')}</p>
         </div>
       )}
 
@@ -303,7 +363,7 @@ const OperatorDashboard = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             {activeTab !== 'dashboard' && (
               <button style={s.backBtn}
-                onClick={() => { const tabs = NAV.map(n => n.id); const i = tabs.indexOf(activeTab); if (i > 0) setActiveTab(tabs[i - 1]); }}>
+                onClick={() => { const tabs = navItems.map(n => n.id); const i = tabs.indexOf(activeTab); if (i > 0) setActiveTab(tabs[i - 1]); }}>
                 ←
               </button>
             )}
@@ -411,7 +471,7 @@ const OperatorDashboard = () => {
                     <div style={{ ...s.fuelProgressFill, width: `${fuelLevel}%`, background: `linear-gradient(90deg, ${fuelColor}, ${fuelColor}88)` }} />
                   </div>
                   <button style={s.fuelUpdateBtn} onClick={() => setShowFuelModal(true)}>
-                    {String.fromCodePoint(0x26FD)} Update Fuel
+                    {String.fromCodePoint(0x26FD)} {t('updateFuel')}
                   </button>
                 </div>
               </div>
@@ -458,7 +518,7 @@ const OperatorDashboard = () => {
               <h3 style={s.cardTitle}>{String.fromCodePoint(0x1F4C5)} Attendance History</h3>
               <div style={{ overflowX: 'auto' }}>
                 <table style={s.table}>
-                  <thead><tr>{['Date', 'Status', 'In', 'Out', 'HMR'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
+                <thead><tr>{[t('date'), t('status'), t('tableIn'), t('tableOut'), 'HMR'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
                   <tbody>
                     {attendanceRows.map((a, i) => (
                       <tr key={i} style={s.tr}>
@@ -472,6 +532,20 @@ const OperatorDashboard = () => {
                   </tbody>
                 </table>
               </div>
+              {attendanceHasMore && (
+                <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+                  <button
+                    style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '8px', padding: '8px 14px', cursor: attendanceLoadingMore ? 'wait' : 'pointer', opacity: attendanceLoadingMore ? 0.7 : 1 }}
+                    disabled={attendanceLoadingMore}
+                    onClick={loadMoreAttendance}
+                  >
+                    {attendanceLoadingMore ? t('loading') : t('loadMoreAttendance')}
+                  </button>
+                </div>
+              )}
+              <p style={{ color: '#8896a8', fontSize: '11px', textAlign: 'center', margin: '8px 0 0' }}>
+                Loaded {attendanceRows.length} attendance rows{attendanceHasMore ? ' (more available)' : ' (all loaded)'}
+              </p>
             </div>
           </div>
         )}
@@ -550,7 +624,7 @@ const OperatorDashboard = () => {
                   <input type="range" min="0" max="100" value={fuelLevel} onChange={e => setFuelLevel(Number(e.target.value))} style={{ width: '100%', accentColor: '#c9a84c', marginBottom: '8px' }} />
                   <input style={{ ...s.input, marginBottom: '10px', fontSize: '13px' }} placeholder="Note: Refilled / Fuel used..." value={fuelNote} onChange={e => setFuelNote(e.target.value)} />
                   <button style={s.primaryBtn} onClick={handleFuelUpdate}>
-                    {String.fromCodePoint(0x2705)} Fuel Update Submit
+                    {String.fromCodePoint(0x2705)} {t('updateFuel')} {t('submit')}
                   </button>
                 </div>
               </div>
@@ -559,7 +633,7 @@ const OperatorDashboard = () => {
               <h3 style={s.cardTitle}>{String.fromCodePoint(0x26FD)} Fuel History</h3>
               <div style={{ overflowX: 'auto' }}>
                 <table style={s.table}>
-                  <thead><tr>{['Date', 'Time', 'Level', 'Change', 'Note'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
+                <thead><tr>{[t('date'), 'Time', t('tableLevel'), t('tableChange'), t('tableNote')].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
                   <tbody>
                     {fuelRows.map((f, i) => (
                       <tr key={i} style={s.tr}>
@@ -573,6 +647,20 @@ const OperatorDashboard = () => {
                   </tbody>
                 </table>
               </div>
+              {fuelHasMore && (
+                <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+                  <button
+                    style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '8px', padding: '8px 14px', cursor: fuelLoadingMore ? 'wait' : 'pointer', opacity: fuelLoadingMore ? 0.7 : 1 }}
+                    disabled={fuelLoadingMore}
+                    onClick={loadMoreFuelLogs}
+                  >
+                    {fuelLoadingMore ? t('loading') : t('loadMoreFuelLogs')}
+                  </button>
+                </div>
+              )}
+              <p style={{ color: '#8896a8', fontSize: '11px', textAlign: 'center', margin: '8px 0 0' }}>
+                {t('loadedFuelLogs')}: {fuelRows.length}{fuelHasMore ? ` (${t('moreAvailable')})` : ` (${t('allLoaded')})`}
+              </p>
             </div>
           </div>
         )}
@@ -580,10 +668,10 @@ const OperatorDashboard = () => {
         {/* --- DAILY REPORT TAB --- */}
         {activeTab === 'daily' && (
           <div style={s.card}>
-            <h3 style={s.cardTitle}>{String.fromCodePoint(0x1F4CB)} Daily Work Report � April 2026</h3>
+            <h3 style={s.cardTitle}>{String.fromCodePoint(0x1F4CB)} {t('dailyWorkReport')} � April 2026</h3>
             <div style={{ overflowX: 'auto' }}>
               <table style={s.table}>
-                <thead><tr>{['Date', 'Att', 'Start', 'End', 'HMR', 'Fuel?', 'Fuel?', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
+                <thead><tr>{[t('date'), t('tableAtt'), t('tableStart'), t('tableEnd'), 'HMR', 'Fuel?', 'Fuel?', t('status')].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
                 <tbody>
                   {dailyReports.map((r, i) => (
                     <tr key={i} style={s.tr}>
@@ -607,7 +695,7 @@ const OperatorDashboard = () => {
         {activeTab === 'issues' && (
           <div>
             <div style={{ ...s.card, border: '1px solid rgba(233,69,96,0.3)' }}>
-              <h3 style={{ ...s.cardTitle, color: '#e94560' }}>{String.fromCodePoint(0x26A0)} Issue Report ⚠</h3>
+              <h3 style={{ ...s.cardTitle, color: '#e94560' }}>{String.fromCodePoint(0x26A0)} {t('issueReportTitle')} ⚠</h3>
               <p style={{ color: '#8896a8', fontSize: '12px', marginBottom: '14px' }}>Any machine issue report kara immediately.</p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '14px' }}>
                 {[
@@ -633,7 +721,7 @@ const OperatorDashboard = () => {
               </button>
             </div>
             <div style={s.card}>
-              <h3 style={s.cardTitle}>{String.fromCodePoint(0x1F4CB)} Past Issues</h3>
+              <h3 style={s.cardTitle}>{String.fromCodePoint(0x1F4CB)} {t('pastIssuesTitle')}</h3>
               {pastIssues.map((issue, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px 12px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', marginBottom: '8px', borderLeft: `3px solid ${issue.resolved ? '#4CAF50' : '#e94560'}` }}>
                   <span style={{ fontSize: '16px' }}>{String.fromCodePoint(0x26A0)}</span>
@@ -656,14 +744,14 @@ const OperatorDashboard = () => {
       {showFuelModal && (
         <div style={s.modalOverlay}>
           <div style={{ ...s.modal, width: isSmall ? '94%' : '360px' }}>
-            <h3 style={{ color: '#FF9800', fontSize: '16px', margin: '0 0 14px', textAlign: 'center' }}>{String.fromCodePoint(0x26FD)} Fuel Level Update</h3>
+            <h3 style={{ color: '#FF9800', fontSize: '16px', margin: '0 0 14px', textAlign: 'center' }}>{String.fromCodePoint(0x26FD)} {t('fuelLevelUpdate')}</h3>
             <p style={{ color: '#8896a8', textAlign: 'center', marginBottom: '8px' }}>Current: <strong style={{ color: fuelColor }}>{fuelLevel}%</strong></p>
             <input type="range" min="0" max="100" value={fuelLevel} onChange={e => setFuelLevel(Number(e.target.value))} style={{ width: '100%', accentColor: '#c9a84c', marginBottom: '8px' }} />
             <p style={{ color: '#c9a84c', fontSize: '24px', fontWeight: '700', textAlign: 'center', margin: '0 0 12px' }}>{fuelLevel}%</p>
             <input style={{ ...s.input, marginBottom: '12px', fontSize: '13px' }} placeholder="Note: Refilled 50 Ltrs..." value={fuelNote} onChange={e => setFuelNote(e.target.value)} />
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button style={s.cancelBtn} onClick={() => setShowFuelModal(false)}>Cancel</button>
-              <button style={s.confirmBtn} onClick={handleFuelUpdate}>{String.fromCodePoint(0x2705)} Update</button>
+              <button style={s.cancelBtn} onClick={() => setShowFuelModal(false)}>{t('cancelText')}</button>
+              <button style={s.confirmBtn} onClick={handleFuelUpdate}>{String.fromCodePoint(0x2705)} {t('updateText')}</button>
             </div>
           </div>
         </div>
@@ -673,7 +761,7 @@ const OperatorDashboard = () => {
       {showIssueModal && (
         <div style={s.modalOverlay}>
           <div style={{ ...s.modal, width: isSmall ? '94%' : '360px' }}>
-            <h3 style={{ color: '#e94560', fontSize: '16px', margin: '0 0 14px', textAlign: 'center' }}>{String.fromCodePoint(0x26A0)} Quick Issue Report</h3>
+            <h3 style={{ color: '#e94560', fontSize: '16px', margin: '0 0 14px', textAlign: 'center' }}>{String.fromCodePoint(0x26A0)} {t('quickIssueReport')}</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px', marginBottom: '12px' }}>
               {[
                 { id: 'mechanical', icon: String.fromCodePoint(0x1F527), label: 'Mechanical' },
@@ -691,8 +779,8 @@ const OperatorDashboard = () => {
             <textarea style={{ ...s.input, width: '100%', height: '80px', boxSizing: 'border-box', marginBottom: '12px', resize: 'none', fontSize: '13px' }}
               placeholder="?????? ???????? ?????..." value={issueNote} onChange={e => setIssueNote(e.target.value)} />
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button style={s.cancelBtn} onClick={() => setShowIssueModal(false)}>Cancel</button>
-              <button style={{ ...s.confirmBtn, background: 'linear-gradient(135deg, #c0392b, #e74c3c)' }} onClick={handleReportIssue}>{String.fromCodePoint(0x1F6A8)} Report</button>
+              <button style={s.cancelBtn} onClick={() => setShowIssueModal(false)}>{t('cancelText')}</button>
+              <button style={{ ...s.confirmBtn, background: 'linear-gradient(135deg, #c0392b, #e74c3c)' }} onClick={handleReportIssue}>{String.fromCodePoint(0x1F6A8)} {t('reportText')}</button>
             </div>
           </div>
         </div>

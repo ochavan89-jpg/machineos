@@ -7,19 +7,21 @@ import LanguageSelector from '../components/LanguageSelector';
 import { generateInternalLedger } from '../services/pdfGenerator';
 import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
-import { getMachines, getAllBookings, getAllUsers, getAllTransactions, getAllIssues, getPendingUsers, approveUser, rejectUser, getDlqItems, retryDlqItem, getDlqStats, getAuditLogs, getRateLimitTelemetry, acknowledgeSecuritySignal } from '../supabaseService';
+import { getMachinesPage, getAllBookingsPage, getAllUsersPage, getAllTransactionsPage, getAllIssuesPage, getPendingUsers, approveUser, rejectUser, getDlqItems, retryDlqItem, getDlqStats, getAuditLogs, getRateLimitTelemetry, getApiHealthTelemetry, acknowledgeSecuritySignal } from '../supabaseService';
+import { appendUniqueById } from '../utils/pagination';
 
 const NAV = [
-  { id: 'overview', icon: String.fromCodePoint(0x1F4CA), label: 'Overview' },
-  { id: 'machines', icon: String.fromCodePoint(0x1F69C), label: 'Machines' },
-  { id: 'bookings', icon: String.fromCodePoint(0x1F4CB), label: 'Bookings' },
-  { id: 'clients', icon: String.fromCodePoint(0x1F477), label: 'Clients' },
-  { id: 'operators', icon: String.fromCodePoint(0x1F527), label: 'Operators' },
-  { id: 'wallet', icon: String.fromCodePoint(0x1F4B3), label: 'Wallet & Billing' },
-  { id: 'approvals', icon: String.fromCodePoint(0x23F3), label: 'Approvals' },
-  { id: 'dlq', icon: String.fromCodePoint(0x1F9EF), label: 'DLQ Monitor' },
-  { id: 'audit', icon: String.fromCodePoint(0x1F4DC), label: 'Audit Logs' },
-  { id: 'reports', icon: String.fromCodePoint(0x1F4C8), label: 'Reports' },
+  { id: 'overview', icon: String.fromCodePoint(0x1F4CA), label: 'Overview', i18nKey: 'overview' },
+  { id: 'machines', icon: String.fromCodePoint(0x1F69C), label: 'Machines', i18nKey: 'machines' },
+  { id: 'bookings', icon: String.fromCodePoint(0x1F4CB), label: 'Bookings', i18nKey: 'myBookings' },
+  { id: 'clients', icon: String.fromCodePoint(0x1F477), label: 'Clients', i18nKey: 'clients' },
+  { id: 'owners', icon: String.fromCodePoint(0x1F3D7), label: 'Owners', i18nKey: 'owners' },
+  { id: 'operators', icon: String.fromCodePoint(0x1F527), label: 'Operators', i18nKey: 'operators' },
+  { id: 'wallet', icon: String.fromCodePoint(0x1F4B3), label: 'Wallet & Billing', i18nKey: 'billingWallet' },
+  { id: 'approvals', icon: String.fromCodePoint(0x23F3), label: 'Approvals', i18nKey: 'approvals' },
+  { id: 'dlq', icon: String.fromCodePoint(0x1F9EF), label: 'DLQ Monitor', i18nKey: 'dlqMonitor' },
+  { id: 'audit', icon: String.fromCodePoint(0x1F4DC), label: 'Audit Logs', i18nKey: 'auditLogs' },
+  { id: 'reports', icon: String.fromCodePoint(0x1F4C8), label: 'Reports', i18nKey: 'reports' },
 ];
 
 const MonthAccordion = ({ month, days, userData, s, isSmall }) => {
@@ -100,6 +102,7 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   useSessionTimeout();
   const { t } = useLanguage(); // eslint-disable-line
+  const navItems = useMemo(() => NAV.map((item) => ({ ...item, label: item.i18nKey ? t(item.i18nKey) : item.label })), [t]);
   const { isMobile, isTablet } = useWindowSize();
   const [activeTab, setActiveTab] = useState('overview');
 
@@ -108,6 +111,18 @@ const AdminDashboard = () => {
   const [userData, setUserData] = useState([]);
   const [transactionData, setTransactionData] = useState([]);
   const [issueData, setIssueData] = useState([]);
+  const [machinesOffset, setMachinesOffset] = useState(0);
+  const [machinesHasMore, setMachinesHasMore] = useState(false);
+  const [machinesLoadingMore, setMachinesLoadingMore] = useState(false);
+  const [bookingsOffset, setBookingsOffset] = useState(0);
+  const [bookingsHasMore, setBookingsHasMore] = useState(false);
+  const [bookingsLoadingMore, setBookingsLoadingMore] = useState(false);
+  const [transactionsOffset, setTransactionsOffset] = useState(0);
+  const [transactionsHasMore, setTransactionsHasMore] = useState(false);
+  const [transactionsLoadingMore, setTransactionsLoadingMore] = useState(false);
+  const [issuesOffset, setIssuesOffset] = useState(0);
+  const [issuesHasMore, setIssuesHasMore] = useState(false);
+  const [issuesLoadingMore, setIssuesLoadingMore] = useState(false);
   const [dlqData, setDlqData] = useState([]);
   const [dlqCounters, setDlqCounters] = useState({});
   const [dlqQueueFilter, setDlqQueueFilter] = useState('');
@@ -142,8 +157,13 @@ const AdminDashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [pendingUsers, setPendingUsers] = useState([]);
+  const [usersOffset, setUsersOffset] = useState(0);
+  const [usersHasMore, setUsersHasMore] = useState(false);
+  const [usersLoadingMore, setUsersLoadingMore] = useState(false);
   const [rateTelemetry, setRateTelemetry] = useState({ allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0 });
+  const [apiHealthTelemetry, setApiHealthTelemetry] = useState({ totalRequests: 0, errors5xx: 0, errorRatePct: 0, p95Ms: 0, p99Ms: 0, slo: { p95MsThreshold: 0, errorRatePctThreshold: 0, p95Healthy: true, errorRateHealthy: true }, byRoute: [] });
   const [securitySignals, setSecuritySignals] = useState([]);
+  const [failedLogins, setFailedLogins] = useState([]);
   const [securityRefreshing, setSecurityRefreshing] = useState(false);
   const [securitySeverityFilter, setSecuritySeverityFilter] = useState('ALL');
   const [acknowledgedSignalIds, setAcknowledgedSignalIds] = useState({});
@@ -159,75 +179,187 @@ const AdminDashboard = () => {
     }
   };
   const waitMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const apiHealthEnabled = String(process.env.REACT_APP_ENABLE_API_HEALTH_TELEMETRY || 'false').toLowerCase() === 'true';
   const fetchSecurityDataWithRetry = useCallback(async (maxAttempts = 3) => {
     let telemetry = null;
     let secLogs = null;
+    let failedLoginLogs = null;
     let ackLogs = null;
+    let apiHealth = null;
     let lastError = '';
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-      telemetry = await getRateLimitTelemetry();
-      secLogs = await getAuditLogs({ action: 'security.admin_', limit: 12 });
-      ackLogs = await getAuditLogs({ action: 'security.signal_acknowledged', limit: 100 });
-      const hasError = telemetry?.error || secLogs?.error || ackLogs?.error;
+      [telemetry, secLogs, failedLoginLogs, ackLogs] = await Promise.all([
+        getRateLimitTelemetry(),
+        getAuditLogs({ action: 'security.', limit: 20 }),
+        getAuditLogs({ action: 'security.auth_login_failed', limit: 20 }),
+        getAuditLogs({ action: 'security.signal_acknowledged', limit: 100 }),
+      ]);
+      apiHealth = apiHealthEnabled
+        ? await getApiHealthTelemetry()
+        : {
+            windowMs: 0,
+            totalRequests: 0,
+            errors5xx: 0,
+            errorRatePct: 0,
+            p95Ms: 0,
+            p99Ms: 0,
+            slo: { p95MsThreshold: 0, errorRatePctThreshold: 0, p95Healthy: true, errorRateHealthy: true },
+            byRoute: [],
+            error: '',
+            unavailableReason: 'disabled',
+          };
+      const hasError = telemetry?.error || secLogs?.error || failedLoginLogs?.error || ackLogs?.error || apiHealth?.error;
       if (!hasError) {
-        return { telemetry, secLogs, ackLogs, error: '' };
+        return { telemetry, secLogs, failedLoginLogs, ackLogs, apiHealth, error: '' };
       }
-      lastError = telemetry?.error || secLogs?.error || ackLogs?.error || 'security panel fetch failed';
+      lastError = telemetry?.error || secLogs?.error || failedLoginLogs?.error || ackLogs?.error || apiHealth?.error || 'security panel fetch failed';
       if (attempt < maxAttempts) {
         await waitMs(250 * (2 ** (attempt - 1)));
       }
     }
-    return { telemetry, secLogs, ackLogs, error: lastError };
-  }, []);
+    return { telemetry, secLogs, failedLoginLogs, ackLogs, apiHealth, error: lastError };
+  }, [apiHealthEnabled]);
 
   useEffect(() => {
     const loadData = async () => {
-      const [machines, bookings, users, transactions, issues, dlq] = await Promise.all([
-        getMachines(),
-        getAllBookings(),
-        getAllUsers(),
-        getAllTransactions(),
-        getAllIssues(),
-        getDlqItems({ limit: 100 }),
-      ]);
-      setMachineData(machines);
-      setBookingData(bookings);
-      setUserData(users);
-      setTransactionData(transactions);
-      setIssueData(issues);
-      setDlqData(dlq.items || []);
-      setDlqCounters(dlq.counters || {});
-      setDlqCursor(dlq.nextCursor || null);
-      setDlqHasMore(Boolean(dlq.hasMore));
-      setDlqStats(await getDlqStats());
-      const securityData = await fetchSecurityDataWithRetry(3);
-      setRateTelemetry(securityData.telemetry || { allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0 });
-      setSecuritySignals(securityData.secLogs?.items || []);
-      const ackMap = {};
-      (securityData.ackLogs?.items || []).forEach((x) => {
-        const sid = x?.metadata?.signalId;
-        if (sid) {
-          ackMap[sid] = {
-            acknowledged: true,
-            actorId: x.actor_id || '-',
-            acknowledgedAt: x.created_at || null,
-          };
-        }
-      });
-      setAcknowledgedSignalIds(ackMap);
-      setSecurityLastRefreshedAt(new Date().toISOString());
-      setSecurityPanelMessage(securityData.error ? `Security panel retry exhausted: ${securityData.error.slice(0, 120)}` : '');
-      setLoading(false);
-      const pending = await getPendingUsers();
-      setPendingUsers(pending);
+      try {
+        const [
+          machinesPage,
+          bookingsPage,
+          usersPage,
+          transactionsPage,
+          issuesPage,
+          pending,
+        ] = await Promise.all([
+          getMachinesPage({ limit: 250, offset: 0 }),
+          getAllBookingsPage({ limit: 250, offset: 0 }),
+          getAllUsersPage({ limit: 250, offset: 0 }),
+          getAllTransactionsPage({ limit: 250, offset: 0 }),
+          getAllIssuesPage({ limit: 250, offset: 0 }),
+          getPendingUsers(),
+        ]);
+        setMachineData(machinesPage.items || []);
+        setMachinesHasMore(Boolean(machinesPage.hasMore));
+        setMachinesOffset(machinesPage.nextOffset || 0);
+        setBookingData(bookingsPage.items || []);
+        setBookingsHasMore(Boolean(bookingsPage.hasMore));
+        setBookingsOffset(bookingsPage.nextOffset || 0);
+        setUserData(usersPage.items || []);
+        setUsersHasMore(Boolean(usersPage.hasMore));
+        setUsersOffset(usersPage.nextOffset || 0);
+        setTransactionData(transactionsPage.items || []);
+        setTransactionsHasMore(Boolean(transactionsPage.hasMore));
+        setTransactionsOffset(transactionsPage.nextOffset || 0);
+        setIssueData(issuesPage.items || []);
+        setIssuesHasMore(Boolean(issuesPage.hasMore));
+        setIssuesOffset(issuesPage.nextOffset || 0);
+        setPendingUsers(Array.isArray(pending) ? pending : []);
+
+        void (async () => {
+          try {
+            const securityData = await fetchSecurityDataWithRetry(2);
+            setRateTelemetry(securityData.telemetry || { allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0 });
+            setApiHealthTelemetry(securityData.apiHealth || { totalRequests: 0, errors5xx: 0, errorRatePct: 0, p95Ms: 0, p99Ms: 0, slo: { p95MsThreshold: 0, errorRatePctThreshold: 0, p95Healthy: true, errorRateHealthy: true }, byRoute: [] });
+            setSecuritySignals(securityData.secLogs?.items || []);
+            setFailedLogins(securityData.failedLoginLogs?.items || []);
+            const ackMap = {};
+            (securityData.ackLogs?.items || []).forEach((x) => {
+              const sid = x?.metadata?.signalId;
+              if (sid) {
+                ackMap[sid] = {
+                  acknowledged: true,
+                  actorId: x.actor_id || '-',
+                  acknowledgedAt: x.created_at || null,
+                };
+              }
+            });
+            setAcknowledgedSignalIds(ackMap);
+            setSecurityLastRefreshedAt(new Date().toISOString());
+            setSecurityPanelMessage(securityData.error ? `Security panel retry exhausted: ${securityData.error.slice(0, 120)}` : '');
+          } catch (_err) {
+            setSecurityPanelMessage('Security panel load failed');
+          }
+        })();
+      } catch (_err) {
+        setSecurityPanelMessage('Dashboard data load failed — refresh the page or check your connection.');
+      } finally {
+        setLoading(false);
+      }
     };
     loadData();
   }, [fetchSecurityDataWithRetry]);
+  const loadMoreUsers = async () => {
+    if (!usersHasMore || usersLoadingMore) return;
+    setUsersLoadingMore(true);
+    const result = await getAllUsersPage({ limit: 250, offset: usersOffset });
+    if ((result.items || []).length > 0) {
+      setUserData((prev) => appendUniqueById(prev, result.items));
+      setUsersOffset(result.nextOffset || usersOffset);
+      setUsersHasMore(Boolean(result.hasMore));
+    } else {
+      setUsersHasMore(false);
+    }
+    setUsersLoadingMore(false);
+  };
+  const loadMoreMachines = async () => {
+    if (!machinesHasMore || machinesLoadingMore) return;
+    setMachinesLoadingMore(true);
+    const result = await getMachinesPage({ limit: 250, offset: machinesOffset });
+    if ((result.items || []).length > 0) {
+      setMachineData((prev) => appendUniqueById(prev, result.items));
+      setMachinesOffset(result.nextOffset || machinesOffset);
+      setMachinesHasMore(Boolean(result.hasMore));
+    } else {
+      setMachinesHasMore(false);
+    }
+    setMachinesLoadingMore(false);
+  };
+  const loadMoreBookings = async () => {
+    if (!bookingsHasMore || bookingsLoadingMore) return;
+    setBookingsLoadingMore(true);
+    const result = await getAllBookingsPage({ limit: 250, offset: bookingsOffset });
+    if ((result.items || []).length > 0) {
+      setBookingData((prev) => appendUniqueById(prev, result.items));
+      setBookingsOffset(result.nextOffset || bookingsOffset);
+      setBookingsHasMore(Boolean(result.hasMore));
+    } else {
+      setBookingsHasMore(false);
+    }
+    setBookingsLoadingMore(false);
+  };
+  const loadMoreTransactions = async () => {
+    if (!transactionsHasMore || transactionsLoadingMore) return;
+    setTransactionsLoadingMore(true);
+    const result = await getAllTransactionsPage({ limit: 250, offset: transactionsOffset });
+    if ((result.items || []).length > 0) {
+      setTransactionData((prev) => appendUniqueById(prev, result.items));
+      setTransactionsOffset(result.nextOffset || transactionsOffset);
+      setTransactionsHasMore(Boolean(result.hasMore));
+    } else {
+      setTransactionsHasMore(false);
+    }
+    setTransactionsLoadingMore(false);
+  };
+  const loadMoreIssues = async () => {
+    if (!issuesHasMore || issuesLoadingMore) return;
+    setIssuesLoadingMore(true);
+    const result = await getAllIssuesPage({ limit: 250, offset: issuesOffset });
+    if ((result.items || []).length > 0) {
+      setIssueData((prev) => appendUniqueById(prev, result.items));
+      setIssuesOffset(result.nextOffset || issuesOffset);
+      setIssuesHasMore(Boolean(result.hasMore));
+    } else {
+      setIssuesHasMore(false);
+    }
+    setIssuesLoadingMore(false);
+  };
   const refreshSecurityPanel = useCallback(async () => {
     setSecurityRefreshing(true);
     const securityData = await fetchSecurityDataWithRetry(3);
     setRateTelemetry(securityData.telemetry || { allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0 });
+    setApiHealthTelemetry(securityData.apiHealth || { totalRequests: 0, errors5xx: 0, errorRatePct: 0, p95Ms: 0, p99Ms: 0, slo: { p95MsThreshold: 0, errorRatePctThreshold: 0, p95Healthy: true, errorRateHealthy: true }, byRoute: [] });
     setSecuritySignals(securityData.secLogs?.items || []);
+    setFailedLogins(securityData.failedLoginLogs?.items || []);
     const ackMap = {};
     (securityData.ackLogs?.items || []).forEach((x) => {
       const sid = x?.metadata?.signalId;
@@ -283,7 +415,7 @@ const AdminDashboard = () => {
       cursor: dlqCursor,
       limit: 100,
     });
-    setDlqData((prev) => [...prev, ...(result.items || [])]);
+    setDlqData((prev) => appendUniqueById(prev, result.items || []));
     setDlqCursor(result.nextCursor || null);
     setDlqHasMore(Boolean(result.hasMore));
     setDlqLoadingMore(false);
@@ -453,13 +585,13 @@ const AdminDashboard = () => {
       cursor: auditCursor,
       limit: 120,
     });
-    setAuditLogs((prev) => [...prev, ...(result.items || [])]);
+    setAuditLogs((prev) => appendUniqueById(prev, result.items || []));
     setAuditCursor(result.nextCursor || null);
     setAuditHasMore(Boolean(result.hasMore));
     if (result.error) {
       setAuditMessage(`Audit fetch error: ${result.error.slice(0, 120)}`);
     } else if (!result.items || result.items.length === 0) {
-      setAuditMessage('No more audit logs found for current filters.');
+      setAuditMessage(t('noMoreAuditLogs'));
       setTimeout(() => setAuditMessage(''), 2500);
     } else {
       setAuditMessage('');
@@ -503,6 +635,29 @@ const AdminDashboard = () => {
   const blockedRate = (rateTelemetry.allowed + rateTelemetry.blocked) > 0
     ? Math.round((rateTelemetry.blocked / (rateTelemetry.allowed + rateTelemetry.blocked)) * 100)
     : 0;
+  const topFailedLogins = (failedLogins || []).slice(0, 6);
+  const failedByIp = useMemo(() => {
+    const bucket = {};
+    (failedLogins || []).forEach((row) => {
+      const ip = row?.metadata?.ip || 'unknown';
+      bucket[ip] = (bucket[ip] || 0) + 1;
+    });
+    return Object.entries(bucket)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3);
+  }, [failedLogins]);
+  const identifierBurstMap = useMemo(() => {
+    const bucket = {};
+    (failedLogins || []).forEach((row) => {
+      const key = `${row?.metadata?.identifier || 'unknown'}|${row?.metadata?.role || '-'}`;
+      bucket[key] = (bucket[key] || 0) + 1;
+    });
+    return bucket;
+  }, [failedLogins]);
+  const apiSloSignals = useMemo(
+    () => (securitySignals || []).filter((row) => row?.action === 'security.api_slo_breach').slice(0, 5),
+    [securitySignals],
+  );
   const exportSecuritySignalsCsv = () => {
     if (visibleSecuritySignals.length === 0) return;
     const header = ['signal_id', 'action', 'severity', 'created_at', 'acknowledged', 'acknowledged_by', 'acknowledged_at'];
@@ -537,7 +692,7 @@ const AdminDashboard = () => {
     <div style={s.container}>
       {isSmall && (
         <MobileNav
-          navItems={NAV}
+          navItems={navItems}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           title="Development Express"
@@ -560,7 +715,7 @@ const AdminDashboard = () => {
             </div>
           </div>
           <div style={s.divider} />
-          {NAV.map(item => (
+          {navItems.map(item => (
             <button key={item.id} style={activeTab === item.id ? s.navActive : s.nav} onClick={() => setActiveTab(item.id)}>
               <span>{item.icon}</span>
               <span>{item.label}</span>
@@ -575,7 +730,7 @@ const AdminDashboard = () => {
       <div style={{ ...s.main, padding: isSmall ? '70px 12px 70px' : '25px' }}>
         <div style={{ ...s.header, flexDirection: isSmall ? 'column' : 'row', gap: isSmall ? '10px' : '0', alignItems: 'flex-start' }}>
           <div>
-            <button style={{ background:'rgba(201,168,76,0.08)', border:'1px solid rgba(201,168,76,0.2)', color:'#c9a84c', borderRadius:'20px', padding:'5px 12px 5px 8px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px', display:'flex', alignItems:'center', gap:'5px', width:'fit-content' }} onClick={() => { const tabs=['overview','machines','bookings','clients','operators','wallet','approvals','dlq','audit','reports']; const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>&#8592;</button>
+            <button style={{ background:'rgba(201,168,76,0.08)', border:'1px solid rgba(201,168,76,0.2)', color:'#c9a84c', borderRadius:'20px', padding:'5px 12px 5px 8px', fontSize:'12px', cursor:'pointer', fontWeight:'600', marginBottom:'6px', display:'flex', alignItems:'center', gap:'5px', width:'fit-content' }} onClick={() => { const tabs=['overview','machines','bookings','clients','owners','operators','wallet','approvals','dlq','audit','reports']; const i=tabs.indexOf(activeTab); if(i>0) setActiveTab(tabs[i-1]); }}>&#8592;</button>
             <h2 style={{ ...s.pageTitle, fontSize: isSmall ? '16px' : '22px' }}>
               {NAV.find(n => n.id === activeTab)?.icon}{' '}
               {NAV.find(n => n.id === activeTab)?.label}
@@ -597,7 +752,7 @@ const AdminDashboard = () => {
         {loading && (
           <div style={{ textAlign: 'center', padding: '40px', color: '#c9a84c' }}>
             <p style={{ fontSize: '30px', margin: '0 0 12px' }}>⏳</p>
-            <p>Loading Real Data from Supabase...</p>
+            <p>{t('loadingDashboard')}</p>
           </div>
         )}
 
@@ -674,12 +829,23 @@ const AdminDashboard = () => {
                     <p style={s.alertTime}>{a.time}</p>
                   </div>
                 ))}
+                {issuesHasMore && (
+                  <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+                    <button
+                      style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '8px', padding: '8px 14px', cursor: issuesLoadingMore ? 'wait' : 'pointer', opacity: issuesLoadingMore ? 0.7 : 1 }}
+                      disabled={issuesLoadingMore}
+                      onClick={loadMoreIssues}
+                    >
+                      {issuesLoadingMore ? t('loading') : t('loadMoreAlerts')}
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
             <div style={{ ...s.bottomRow, gridTemplateColumns: isSmall ? '1fr' : '1fr 1fr', marginTop: '20px' }}>
               <div style={s.bottomCard}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                  <h3 style={{ ...s.bottomTitle, margin: 0 }}>🛡️ Security Signals</h3>
+                  <h3 style={{ ...s.bottomTitle, margin: 0 }}>🛡️ {t('securitySignalsTitle')}</h3>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     {['ALL', 'HIGH', 'MEDIUM'].map((level) => (
                       <button
@@ -703,36 +869,36 @@ const AdminDashboard = () => {
                       onClick={refreshSecurityPanel}
                       disabled={securityRefreshing}
                     >
-                      {securityRefreshing ? 'Refreshing...' : 'Refresh'}
+                      {securityRefreshing ? t('refreshingText') : t('refreshText')}
                     </button>
                     <button
                       style={{ background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50', borderRadius: '6px', padding: '4px 8px', fontSize: '11px', cursor: 'pointer' }}
                       onClick={exportSecuritySignalsCsv}
                     >
-                      Export CSV
+                      {t('exportCsv')}
                     </button>
                   </div>
                 </div>
                 <p style={{ color: isSecurityStale ? '#ff9aa8' : '#8896a8', fontSize: '10px', margin: '0 0 8px' }}>
-                  Last refreshed: {securityLastRefreshedAt ? new Date(securityLastRefreshedAt).toLocaleTimeString('en-IN') : 'never'} {isSecurityStale ? '(stale)' : '(live)'}
+                  {t('lastRefreshed')}: {securityLastRefreshedAt ? new Date(securityLastRefreshedAt).toLocaleTimeString('en-IN') : t('neverText')} {isSecurityStale ? `(${t('staleText')})` : `(${t('liveText')})`}
                 </p>
                 {securityPanelMessage && (
                   <p style={{ color: '#ff9aa8', fontSize: '10px', margin: '0 0 8px' }}>{securityPanelMessage}</p>
                 )}
                 {visibleSecuritySignals.length === 0 ? (
-                  <p style={{ color: '#8896a8', fontSize: '12px', margin: 0 }}>No recent suspicious signals.</p>
+                  <p style={{ color: '#8896a8', fontSize: '12px', margin: 0 }}>{t('noSecuritySignalsFound')}</p>
                 ) : (
                   <div>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
                       <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '8px' }}>
-                        <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 4px' }}>HIGH Trend</p>
+                        <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 4px' }}>{t('highTrend')}</p>
                         <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>
                           <div style={{ width: `${Math.round((highCount / severityMax) * 100)}%`, height: '100%', background: '#e94560', borderRadius: '4px' }} />
                         </div>
                         <p style={{ color: '#ff9aa8', fontSize: '10px', margin: '4px 0 0' }}>{highCount}</p>
                       </div>
                       <div style={{ background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '8px' }}>
-                        <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 4px' }}>MEDIUM Trend</p>
+                        <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 4px' }}>{t('mediumTrend')}</p>
                         <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px' }}>
                           <div style={{ width: `${Math.round((mediumCount / severityMax) * 100)}%`, height: '100%', background: '#FFB74D', borderRadius: '4px' }} />
                         </div>
@@ -782,33 +948,48 @@ const AdminDashboard = () => {
                             }
                           }}
                         >
-                          {isAcked ? 'Acknowledged' : 'Acknowledge'}
+                          {isAcked ? t('acknowledgedText') : t('acknowledgeText')}
                         </button>
                       </div>
                     </div>
                     );
                   })}
+                  <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(201,168,76,0.15)' }}>
+                    <h4 style={{ color: '#c9a84c', fontSize: '13px', margin: '0 0 8px' }}>{t('apiSloAlertsTitle')}</h4>
+                    {apiSloSignals.length === 0 ? (
+                      <p style={{ color: '#8896a8', fontSize: '11px', margin: 0 }}>{t('noRecentApiSloBreach')}</p>
+                    ) : apiSloSignals.map((row) => (
+                      <div key={row.id} style={s.alertRow}>
+                        <p style={{ ...s.alertMsg, color: '#ff9aa8' }}>
+                          p95 {row?.metadata?.p95Ms || 0}ms / {row?.metadata?.thresholds?.p95MsThreshold || '-'}ms · error {row?.metadata?.errorRatePct || 0}% / {row?.metadata?.thresholds?.errorRatePctThreshold || '-'}%
+                        </p>
+                        <p style={s.alertTime}>
+                          {row.created_at ? new Date(row.created_at).toLocaleString('en-IN') : '-'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
                   </div>
                 )}
               </div>
               <div style={s.bottomCard}>
-                <h3 style={s.bottomTitle}>📈 Rate Limit Telemetry</h3>
+                <h3 style={s.bottomTitle}>📈 {t('rateLimitTelemetryTitle')}</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginBottom: '10px' }}>
                   <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
-                    <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>Allowed</p>
+                    <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>{t('allowedText')}</p>
                     <p style={{ color: '#4CAF50', margin: 0, fontWeight: '700' }}>{rateTelemetry.allowed || 0}</p>
                   </div>
                   <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
-                    <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>Blocked</p>
+                    <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>{t('blockedText')}</p>
                     <p style={{ color: '#e94560', margin: 0, fontWeight: '700' }}>{rateTelemetry.blocked || 0}</p>
                   </div>
                   <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
-                    <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>Active Buckets</p>
+                    <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>{t('activeBucketsText')}</p>
                     <p style={{ color: '#c9a84c', margin: 0, fontWeight: '700' }}>{rateTelemetry.activeBuckets || 0}</p>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
-                  <p style={{ color: '#8896a8', fontSize: '11px', margin: 0 }}>Blocked Rate: {blockedRate}%</p>
+                  <p style={{ color: '#8896a8', fontSize: '11px', margin: 0 }}>{t('blockedRateText')}: {blockedRate}%</p>
                   <span style={{
                     border: blockedRate >= 15 ? '1px solid rgba(233,69,96,0.45)' : '1px solid rgba(76,175,80,0.45)',
                     color: blockedRate >= 15 ? '#ff9aa8' : '#4CAF50',
@@ -817,15 +998,54 @@ const AdminDashboard = () => {
                     padding: '2px 8px',
                     fontSize: '10px',
                   }}>
-                    {blockedRate >= 15 ? 'ALERT' : 'NORMAL'}
+                    {blockedRate >= 15 ? t('alertText') : t('normalText')}
                   </span>
+                </div>
+                <div style={{ marginBottom: '10px', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '8px' }}>
+                  <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 4px' }}>{t('apiHealthTitle')} ({Math.round((apiHealthTelemetry.windowMs || 0) / 60000)}m)</p>
+                  <p style={{ color: '#e8e0d0', fontSize: '11px', margin: '0 0 2px' }}>
+                    p95: {apiHealthTelemetry.p95Ms || 0}ms / target {apiHealthTelemetry.slo?.p95MsThreshold || 0}ms · error: {apiHealthTelemetry.errorRatePct || 0}% / target {apiHealthTelemetry.slo?.errorRatePctThreshold || 0}%
+                  </p>
+                  <p style={{ color: (apiHealthTelemetry.slo?.p95Healthy && apiHealthTelemetry.slo?.errorRateHealthy) ? '#4CAF50' : '#ff9aa8', fontSize: '10px', margin: 0 }}>
+                    {(apiHealthTelemetry.slo?.p95Healthy && apiHealthTelemetry.slo?.errorRateHealthy) ? t('sloHealthy') : t('sloBreachRisk')}
+                  </p>
                 </div>
                 {(rateTelemetry.byRoute || []).slice(0, 5).map((x) => (
                   <div key={x.route} style={s.alertRow}>
                     <p style={s.alertMsg}>{x.route}</p>
-                    <p style={s.alertTime}>hits: {x.count}</p>
+                    <p style={s.alertTime}>{t('hitsText')}: {x.count}</p>
                   </div>
                 ))}
+                <div style={{ marginTop: '14px', paddingTop: '10px', borderTop: '1px solid rgba(201,168,76,0.15)' }}>
+                  <h4 style={{ color: '#c9a84c', fontSize: '13px', margin: '0 0 8px' }}>{t('recentFailedLoginsTitle')}</h4>
+                  {failedByIp.length > 0 && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '6px', marginBottom: '8px' }}>
+                      {failedByIp.map(([ip, count]) => (
+                        <div key={ip} style={{ background: 'rgba(0,0,0,0.22)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: '8px', padding: '6px 8px' }}>
+                          <p style={{ color: '#8896a8', fontSize: '10px', margin: 0 }}>{t('topSourceIp')}</p>
+                          <p style={{ color: '#e8e0d0', fontSize: '11px', margin: '3px 0 0' }}>{ip} · {t('attemptsLabel')}: {count}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {topFailedLogins.length === 0 ? (
+                    <p style={{ color: '#8896a8', fontSize: '11px', margin: 0 }}>{t('noRecentFailedLogins')}</p>
+                  ) : topFailedLogins.map((row) => (
+                    <div key={row.id} style={s.alertRow}>
+                      <p style={{ ...s.alertMsg, color: (identifierBurstMap[`${row.metadata?.identifier || 'unknown'}|${row.metadata?.role || '-'}`] || 0) >= 3 ? '#ffb3bf' : s.alertMsg.color }}>
+                        {(row.metadata?.identifier || 'unknown')} | {(row.metadata?.role || '-')}
+                        {(identifierBurstMap[`${row.metadata?.identifier || 'unknown'}|${row.metadata?.role || '-'}`] || 0) >= 3 && (
+                          <span style={{ marginLeft: '6px', fontSize: '10px', padding: '2px 6px', borderRadius: '10px', border: '1px solid rgba(233,69,96,0.45)', color: '#ff9aa8', background: 'rgba(233,69,96,0.14)' }}>
+                            {t('burstText')}
+                          </span>
+                        )}
+                      </p>
+                      <p style={s.alertTime}>
+                        {row.metadata?.reason || t('failedText')} · IP: {row.metadata?.ip || t('unknownText')} · {row.created_at ? new Date(row.created_at).toLocaleString('en-IN') : '-'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -874,6 +1094,20 @@ const AdminDashboard = () => {
                   </tbody>
                 </table>
               </div>
+              {machinesHasMore && (
+                <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+                  <button
+                    style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '8px', padding: '8px 14px', cursor: machinesLoadingMore ? 'wait' : 'pointer', opacity: machinesLoadingMore ? 0.7 : 1 }}
+                    disabled={machinesLoadingMore}
+                    onClick={loadMoreMachines}
+                  >
+                    {machinesLoadingMore ? t('loading') : t('loadMoreMachines')}
+                  </button>
+                </div>
+              )}
+              <p style={{ color: '#8896a8', fontSize: '11px', textAlign: 'center', margin: '8px 0 0' }}>
+                Loaded {machineData.length} machines{machinesHasMore ? ' (more available)' : ' (all loaded)'}
+              </p>
             </div>
           </div>
         )}
@@ -907,6 +1141,20 @@ const AdminDashboard = () => {
                 <MonthAccordion key={month} month={month} days={days} userData={userData} s={s} isSmall={isSmall} />
               ));
             })()}
+            {bookingsHasMore && (
+              <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+                <button
+                  style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '8px', padding: '8px 14px', cursor: bookingsLoadingMore ? 'wait' : 'pointer', opacity: bookingsLoadingMore ? 0.7 : 1 }}
+                  disabled={bookingsLoadingMore}
+                  onClick={loadMoreBookings}
+                >
+                  {bookingsLoadingMore ? t('loading') : t('loadMoreBookings')}
+                </button>
+              </div>
+            )}
+            <p style={{ color: '#8896a8', fontSize: '11px', textAlign: 'center', margin: '8px 0 0' }}>
+              Loaded {bookingData.length} bookings{bookingsHasMore ? ' (more available)' : ' (all loaded)'}
+            </p>
           </div>
         )}
         {/* CLIENTS TAB */}
@@ -935,6 +1183,20 @@ const AdminDashboard = () => {
                   </tbody>
                 </table>
               </div>
+              {usersHasMore && (
+                <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+                  <button
+                    style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '8px', padding: '8px 14px', cursor: usersLoadingMore ? 'wait' : 'pointer', opacity: usersLoadingMore ? 0.7 : 1 }}
+                    disabled={usersLoadingMore}
+                    onClick={loadMoreUsers}
+                  >
+                    {usersLoadingMore ? t('loading') : t('loadMoreUsers')}
+                  </button>
+                </div>
+              )}
+              <p style={{ color: '#8896a8', fontSize: '11px', textAlign: 'center', margin: '8px 0 0' }}>
+                Loaded {clientUsers.length} client rows{usersHasMore ? ' (more users available)' : ' (all loaded)'}
+              </p>
             </div>
           </div>
         )}
@@ -963,6 +1225,20 @@ const AdminDashboard = () => {
                   </tbody>
                 </table>
               </div>
+              {usersHasMore && (
+                <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+                  <button
+                    style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '8px', padding: '8px 14px', cursor: usersLoadingMore ? 'wait' : 'pointer', opacity: usersLoadingMore ? 0.7 : 1 }}
+                    disabled={usersLoadingMore}
+                    onClick={loadMoreUsers}
+                  >
+                    {usersLoadingMore ? t('loading') : t('loadMoreUsers')}
+                  </button>
+                </div>
+              )}
+              <p style={{ color: '#8896a8', fontSize: '11px', textAlign: 'center', margin: '8px 0 0' }}>
+                Loaded {ownerUsers.length} owner rows{usersHasMore ? ' (more users available)' : ' (all loaded)'}
+              </p>
             </div>
           </div>
         )}
@@ -1131,7 +1407,7 @@ const AdminDashboard = () => {
               </div>
             </div>
             {dlqData.length === 0 ? (
-              <p style={{ color: '#8896a8', textAlign: 'center', padding: '20px' }}>No DLQ items</p>
+              <p style={{ color: '#8896a8', textAlign: 'center', padding: '20px' }}>{t('noDlqItems')}</p>
             ) : (
               <div>
                 <table style={s.table}>
@@ -1153,7 +1429,7 @@ const AdminDashboard = () => {
                               setDlqRetryReason('');
                             }}
                           >
-                            Retry
+                            {t('retryText')}
                           </button>
                         </td>
                       </tr>
@@ -1167,10 +1443,13 @@ const AdminDashboard = () => {
                       disabled={dlqLoadingMore}
                       onClick={loadMoreDlq}
                     >
-                      {dlqLoadingMore ? 'Loading...' : 'Load More DLQ'}
+                      {dlqLoadingMore ? t('loading') : t('loadMoreDlq')}
                     </button>
                   </div>
                 )}
+                <p style={{ color: '#8896a8', fontSize: '11px', textAlign: 'center', margin: '8px 0 0' }}>
+                  {t('loadedDlqItems')}: {dlqData.length}{dlqHasMore ? ` (${t('moreAvailable')})` : ` (${t('allLoaded')})`}
+                </p>
               </div>
             )}
           </div>
@@ -1179,12 +1458,12 @@ const AdminDashboard = () => {
         {selectedDlqItem && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999 }}>
             <div style={{ width: isSmall ? '92%' : '420px', background: 'linear-gradient(135deg, #0f2040, #0a1628)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '12px', padding: '16px' }}>
-              <h3 style={{ color: '#c9a84c', marginTop: 0 }}>Retry DLQ Item #{selectedDlqItem.id}</h3>
+              <h3 style={{ color: '#c9a84c', marginTop: 0 }}>{t('retryDlqItemTitle')} #{selectedDlqItem.id}</h3>
               <p style={{ color: '#8896a8', fontSize: '12px' }}>Queue: {selectedDlqItem.queue_name} | Job: {selectedDlqItem.job_name}</p>
               <textarea
                 value={dlqRetryReason}
                 onChange={(e) => setDlqRetryReason(e.target.value)}
-                placeholder="Retry reason (for audit)"
+                placeholder={t('retryReasonAuditPlaceholder')}
                 style={{ width: '100%', minHeight: '88px', background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.25)', borderRadius: '8px', padding: '8px', boxSizing: 'border-box' }}
               />
               <p style={{ color: '#8896a8', fontSize: '11px', margin: '6px 0 0' }}>Minimum 8 characters required.</p>
@@ -1203,12 +1482,12 @@ const AdminDashboard = () => {
                       setDlqMessage(`DLQ item ${itemId} retried successfully.`);
                     } else {
                       setDlqData(previous);
-                      setDlqMessage(`Retry failed for DLQ item ${itemId}.`);
+                      setDlqMessage(`${t('retryFailedForDlq')} ${itemId}.`);
                     }
                     setTimeout(() => setDlqMessage(''), 3000);
                   }}
                 >
-                  Confirm Retry
+                  {t('confirmRetry')}
                 </button>
               </div>
             </div>
@@ -1267,22 +1546,22 @@ const AdminDashboard = () => {
                 onChange={(e) => setAuditTo(e.target.value)}
                 style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}
               />
-              <button style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={() => setAuditPreset('today')}>Today</button>
+              <button style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={() => setAuditPreset('today')}>{t('todayText')}</button>
               <button style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={() => setAuditPreset('24h')}>24h</button>
               <button style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={() => setAuditPreset('7d')}>7d</button>
-              <button style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={() => setAuditPreset('')}>Reset</button>
-              <button style={{ background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={exportAuditCsv}>Export CSV</button>
+              <button style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={() => setAuditPreset('')}>{t('resetText')}</button>
+              <button style={{ background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={exportAuditCsv}>{t('exportCsv')}</button>
             </div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ color: '#8896a8', fontSize: '11px' }}>Timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone} (local)</span>
-              <button style={{ background: 'transparent', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={clearAllAuditFilters}>Clear All</button>
-              {auditActionFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('action')}>action x</button>}
-              {auditActorFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('actor')}>actor x</button>}
-              {auditRoleFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('role')}>role x</button>}
-              {auditEntityFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('entity')}>entity x</button>}
-              {auditMetaFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('meta')}>meta x</button>}
-              {auditFrom && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('from')}>from x</button>}
-              {auditTo && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('to')}>to x</button>}
+              <button style={{ background: 'transparent', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={clearAllAuditFilters}>{t('clearAll')}</button>
+              {auditActionFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('action')}>{t('chipAction')} x</button>}
+              {auditActorFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('actor')}>{t('chipActor')} x</button>}
+              {auditRoleFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('role')}>{t('chipRole')} x</button>}
+              {auditEntityFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('entity')}>{t('chipEntity')} x</button>}
+              {auditMetaFilter && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('meta')}>{t('chipMeta')} x</button>}
+              {auditFrom && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('from')}>{t('chipFrom')} x</button>}
+              {auditTo && <button style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '16px', padding: '2px 8px', cursor: 'pointer', fontSize: '11px' }} onClick={() => clearAuditField('to')}>{t('chipTo')} x</button>}
             </div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
               {Object.keys(csvColumns).map((key) => (
@@ -1354,10 +1633,13 @@ const AdminDashboard = () => {
                       disabled={auditLoadingMore}
                       onClick={loadMoreAuditLogs}
                     >
-                      {auditLoadingMore ? 'Loading...' : 'Load More Logs'}
+                      {auditLoadingMore ? t('loading') : t('loadMoreLogs')}
                     </button>
                   </div>
                 )}
+                <p style={{ color: '#8896a8', fontSize: '11px', textAlign: 'center', margin: '8px 0 0' }}>
+                  Loaded {visibleAuditLogs.length} audit logs{auditHasMore ? ' (more available)' : ' (all loaded)'}
+                </p>
               </div>
             )}
           </div>
@@ -1401,7 +1683,7 @@ const AdminDashboard = () => {
                     <tr>{['Ref ID', 'Date', 'Type', 'Amount', 'GST', 'Total', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
-                    {transactionData.length > 0 ? transactionData.slice(0, 10).map((t, i) => (
+                    {transactionData.length > 0 ? transactionData.map((t, i) => (
                       <tr key={i} style={s.tr}>
                         <td style={{ ...s.td, color: '#c9a84c', fontSize: '11px' }}>{t.ref || 'N/A'}</td>
                         <td style={s.td}>{t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN') : 'N/A'}</td>
@@ -1417,6 +1699,20 @@ const AdminDashboard = () => {
                   </tbody>
                 </table>
               </div>
+              {transactionsHasMore && (
+                <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
+                  <button
+                    style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '8px', padding: '8px 14px', cursor: transactionsLoadingMore ? 'wait' : 'pointer', opacity: transactionsLoadingMore ? 0.7 : 1 }}
+                    disabled={transactionsLoadingMore}
+                    onClick={loadMoreTransactions}
+                  >
+                    {transactionsLoadingMore ? t('loading') : t('loadMoreTransactions')}
+                  </button>
+                </div>
+              )}
+              <p style={{ color: '#8896a8', fontSize: '11px', textAlign: 'center', margin: '8px 0 0' }}>
+                Loaded {transactionData.length} transactions{transactionsHasMore ? ' (more available)' : ' (all loaded)'}
+              </p>
             </div>
           </div>
         )}
