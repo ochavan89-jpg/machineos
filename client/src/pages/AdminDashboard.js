@@ -228,6 +228,13 @@ const AdminDashboard = () => {
   const [usersHasMore, setUsersHasMore] = useState(false);
   const [usersLoadingMore, setUsersLoadingMore] = useState(false);
   const [rateTelemetry, setRateTelemetry] = useState({ allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0 });
+  const [rateTelemetryHistory, setRateTelemetryHistory] = useState([]);
+  const [telemetryGroupMode, setTelemetryGroupMode] = useState('day');
+  const [openTelemetryGroups, setOpenTelemetryGroups] = useState({});
+  const [revenueGroupMode, setRevenueGroupMode] = useState('day');
+  const [openRevenueGroups, setOpenRevenueGroups] = useState({});
+  const [alertsGroupMode, setAlertsGroupMode] = useState('day');
+  const [openAlertsGroups, setOpenAlertsGroups] = useState({});
   const [apiHealthTelemetry, setApiHealthTelemetry] = useState({ totalRequests: 0, errors5xx: 0, errorRatePct: 0, p95Ms: 0, p99Ms: 0, slo: { p95MsThreshold: 0, errorRatePctThreshold: 0, p95Healthy: true, errorRateHealthy: true }, byRoute: [] });
   const [securitySignals, setSecuritySignals] = useState([]);
   const [failedLogins, setFailedLogins] = useState([]);
@@ -251,6 +258,21 @@ const AdminDashboard = () => {
     }
   };
   const waitMs = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const pushTelemetrySnapshot = useCallback((telemetry) => {
+    if (!telemetry) return;
+    setRateTelemetryHistory((prev) => {
+      const next = [
+        ...prev,
+        {
+          ts: new Date().toISOString(),
+          allowed: Number(telemetry.allowed || 0),
+          blocked: Number(telemetry.blocked || 0),
+          activeBuckets: Number(telemetry.activeBuckets || 0),
+        },
+      ];
+      return next.slice(-240);
+    });
+  }, []);
   const apiHealthEnabled = String(process.env.REACT_APP_ENABLE_API_HEALTH_TELEMETRY || 'false').toLowerCase() === 'true';
   const fetchSecurityDataWithRetry = useCallback(async (maxAttempts = 3) => {
     let telemetry = null;
@@ -347,7 +369,9 @@ const AdminDashboard = () => {
         void (async () => {
           try {
             const securityData = await fetchSecurityDataWithRetry(2);
-            setRateTelemetry(securityData.telemetry || { allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0 });
+            const telemetrySnapshot = securityData.telemetry || { allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0 };
+            setRateTelemetry(telemetrySnapshot);
+            pushTelemetrySnapshot(telemetrySnapshot);
             setApiHealthTelemetry(securityData.apiHealth || { totalRequests: 0, errors5xx: 0, errorRatePct: 0, p95Ms: 0, p99Ms: 0, slo: { p95MsThreshold: 0, errorRatePctThreshold: 0, p95Healthy: true, errorRateHealthy: true }, byRoute: [] });
             setSecuritySignals(securityData.secLogs?.items || []);
             setFailedLogins(securityData.failedLoginLogs?.items || []);
@@ -376,7 +400,7 @@ const AdminDashboard = () => {
       }
     };
     loadData();
-  }, [fetchSecurityDataWithRetry]);
+  }, [fetchSecurityDataWithRetry, pushTelemetrySnapshot]);
   const loadMoreUsers = async () => {
     if (!usersHasMore || usersLoadingMore) return;
     setUsersLoadingMore(true);
@@ -445,7 +469,9 @@ const AdminDashboard = () => {
   const refreshSecurityPanel = useCallback(async () => {
     setSecurityRefreshing(true);
     const securityData = await fetchSecurityDataWithRetry(3);
-    setRateTelemetry(securityData.telemetry || { allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0 });
+    const telemetrySnapshot = securityData.telemetry || { allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0 };
+    setRateTelemetry(telemetrySnapshot);
+    pushTelemetrySnapshot(telemetrySnapshot);
     setApiHealthTelemetry(securityData.apiHealth || { totalRequests: 0, errors5xx: 0, errorRatePct: 0, p95Ms: 0, p99Ms: 0, slo: { p95MsThreshold: 0, errorRatePctThreshold: 0, p95Healthy: true, errorRateHealthy: true }, byRoute: [] });
     setSecuritySignals(securityData.secLogs?.items || []);
     setFailedLogins(securityData.failedLoginLogs?.items || []);
@@ -464,7 +490,7 @@ const AdminDashboard = () => {
     setSecurityLastRefreshedAt(new Date().toISOString());
     setSecurityPanelMessage(securityData.error ? `Security panel retry exhausted: ${securityData.error.slice(0, 120)}` : '');
     setSecurityRefreshing(false);
-  }, [fetchSecurityDataWithRetry]);
+  }, [fetchSecurityDataWithRetry, pushTelemetrySnapshot]);
   useEffect(() => {
     if (loading) return;
     const timer = setInterval(() => {
@@ -859,17 +885,59 @@ const AdminDashboard = () => {
     { icon: '⛽', value: lowFuelMachines.length.toString(), label: 'Low Fuel Alert', change: '⚠️ Action needed', up: false },
   ];
 
-  const revenue = machineData.map(m => ({
-    label: m.machine_id,
-    value: 'Rs.' + Math.round((m.rate_per_day || 0) * 8 / 1000) + 'K',
-    pct: Math.min(100, Math.round((m.rate_per_day || 0) / 300)),
-  }));
-
-  const alerts = [
-    ...lowFuelMachines.map(m => ({ icon: '⛽', msg: `${m.machine_id} Fuel ${m.fuel_level}% - Critical!`, time: 'Just now', color: '#e94560' })),
-    ...issueData.slice(0, 3).map(issue => ({ icon: '⚠️', msg: `Issue: ${issue.issue_type || 'Unknown'} - ${issue.status}`, time: 'Recent', color: '#FF9800' })),
-    { icon: '✅', msg: 'System Running Normally', time: 'Live', color: '#4CAF50' },
-  ];
+  const alerts = useMemo(() => [
+    ...lowFuelMachines.map(m => ({ icon: '⛽', msg: `${m.machine_id} Fuel ${m.fuel_level}% - Critical!`, time: 'Just now', color: '#e94560', createdAt: new Date().toISOString() })),
+    ...issueData.slice(0, 30).map(issue => ({ icon: '⚠️', msg: `Issue: ${issue.issue_type || 'Unknown'} - ${issue.status}`, time: 'Recent', color: '#FF9800', createdAt: issue.created_at || new Date().toISOString() })),
+    { icon: '✅', msg: 'System Running Normally', time: 'Live', color: '#4CAF50', createdAt: new Date().toISOString() },
+  ], [lowFuelMachines, issueData]);
+  const groupByTemporal = (items, mode, dateSelector) => {
+    const bucket = {};
+    (items || []).forEach((item) => {
+      const raw = dateSelector(item);
+      const dt = raw ? new Date(raw) : null;
+      const valid = dt && !Number.isNaN(dt.getTime());
+      const key = !valid
+        ? 'unknown'
+        : mode === 'month'
+          ? `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`
+          : `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
+      if (!bucket[key]) bucket[key] = [];
+      bucket[key].push(item);
+    });
+    return Object.entries(bucket)
+      .sort((a, b) => String(b[0]).localeCompare(String(a[0])))
+      .map(([key, rows]) => ({
+        key,
+        rows,
+        label: key === 'unknown'
+          ? 'Unknown Time'
+          : mode === 'month'
+            ? new Date(`${key}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+            : new Date(`${key}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }),
+      }));
+  };
+  const revenueTimelineRows = useMemo(
+    () => (bookingData || []).map((b) => ({ amount: Number(b.base_amount || 0), createdAt: b.created_at || b.start_date || null })),
+    [bookingData],
+  );
+  const revenueGroups = useMemo(() => {
+    const grouped = groupByTemporal(revenueTimelineRows, revenueGroupMode, (x) => x.createdAt);
+    return grouped.map((g) => ({
+      ...g,
+      total: g.rows.reduce((sum, x) => sum + Number(x.amount || 0), 0),
+      count: g.rows.length,
+    }));
+  }, [revenueTimelineRows, revenueGroupMode]);
+  const alertsGroups = useMemo(() => groupByTemporal(alerts, alertsGroupMode, (x) => x.createdAt), [alerts, alertsGroupMode]);
+  const telemetryGroups = useMemo(() => {
+    const grouped = groupByTemporal(rateTelemetryHistory, telemetryGroupMode, (x) => x.ts);
+    return grouped.map((g) => ({
+      ...g,
+      allowed: g.rows.reduce((sum, x) => sum + Number(x.allowed || 0), 0),
+      blocked: g.rows.reduce((sum, x) => sum + Number(x.blocked || 0), 0),
+      maxBuckets: g.rows.reduce((max, x) => Math.max(max, Number(x.activeBuckets || 0)), 0),
+    }));
+  }, [rateTelemetryHistory, telemetryGroupMode]);
   const visibleSecuritySignals = securitySignals.filter((row) => {
     if (securitySeverityFilter === 'ALL') return true;
     const severity = row?.metadata?.severity || (row.action?.includes('retry_burst') ? 'HIGH' : 'MEDIUM');
@@ -987,6 +1055,39 @@ const AdminDashboard = () => {
       return next;
     });
   }, [machineStatusGroups]);
+  useEffect(() => {
+    if (!telemetryGroups.length) {
+      setOpenTelemetryGroups({});
+      return;
+    }
+    setOpenTelemetryGroups((prev) => {
+      const next = {};
+      telemetryGroups.forEach((g, idx) => { next[g.key] = Object.prototype.hasOwnProperty.call(prev, g.key) ? prev[g.key] : idx === 0; });
+      return next;
+    });
+  }, [telemetryGroups]);
+  useEffect(() => {
+    if (!revenueGroups.length) {
+      setOpenRevenueGroups({});
+      return;
+    }
+    setOpenRevenueGroups((prev) => {
+      const next = {};
+      revenueGroups.forEach((g, idx) => { next[g.key] = Object.prototype.hasOwnProperty.call(prev, g.key) ? prev[g.key] : idx === 0; });
+      return next;
+    });
+  }, [revenueGroups]);
+  useEffect(() => {
+    if (!alertsGroups.length) {
+      setOpenAlertsGroups({});
+      return;
+    }
+    setOpenAlertsGroups((prev) => {
+      const next = {};
+      alertsGroups.forEach((g, idx) => { next[g.key] = Object.prototype.hasOwnProperty.call(prev, g.key) ? prev[g.key] : idx === 0; });
+      return next;
+    });
+  }, [alertsGroups]);
   const exportSecuritySignalsCsv = () => {
     if (visibleSecuritySignals.length === 0) return;
     const header = ['signal_id', 'action', 'severity', 'created_at', 'acknowledged', 'acknowledged_by', 'acknowledged_at'];
@@ -1293,25 +1394,69 @@ const AdminDashboard = () => {
 
             <div style={{ ...s.bottomRow, gridTemplateColumns: isSmall ? '1fr' : '1fr 1fr' }}>
               <div style={s.bottomCard}>
-                <h3 style={s.bottomTitle}>💰 Revenue This Month</h3>
-                {revenue.slice(0, 5).map((r, i) => (
-                  <div key={i} style={s.revenueRow}>
-                    <span style={s.revenueLabel}>{r.label}</span>
-                    <div style={s.revenueBarBg}>
-                      <div style={{ ...s.revenueBarFill, width: `${r.pct}%` }}></div>
-                    </div>
-                    <span style={s.revenueValue}>{r.value}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                  <h3 style={{ ...s.bottomTitle, margin: 0 }}>💰 Revenue Timeline</h3>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {['day', 'month'].map((mode) => (
+                      <button key={mode} onClick={() => setRevenueGroupMode(mode)} style={{ background: revenueGroupMode === mode ? 'rgba(109,190,255,0.2)' : 'rgba(109,190,255,0.08)', border: revenueGroupMode === mode ? '1px solid rgba(109,190,255,0.5)' : '1px solid rgba(109,190,255,0.28)', color: '#8dd3ff', borderRadius: '12px', padding: '2px 8px', fontSize: '10px', cursor: 'pointer' }}>{mode === 'day' ? 'Day-wise' : 'Month-wise'}</button>
+                    ))}
                   </div>
-                ))}
+                </div>
+                {revenueGroups.length === 0 ? (
+                  <p style={{ color: '#8896a8', fontSize: '11px', margin: 0 }}>No revenue timeline data.</p>
+                ) : revenueGroups.map((g) => {
+                  const isOpen = Boolean(openRevenueGroups[g.key]);
+                  return (
+                    <div key={g.key} style={{ border: '1px solid rgba(201,168,76,0.2)', borderRadius: '10px', marginBottom: '8px', overflow: 'hidden' }}>
+                      <button type="button" onClick={() => setOpenRevenueGroups((prev) => ({ ...prev, [g.key]: !prev[g.key] }))} style={{ width: '100%', background: 'rgba(0,0,0,0.25)', border: 'none', color: '#e8e0d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', cursor: 'pointer' }}>
+                        <span style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ color: '#f2d78b', fontSize: '11px', fontWeight: 700 }}>{g.label}</span>
+                          <span style={{ color: '#8ea2b8', fontSize: '10px' }}>{g.count} bookings</span>
+                        </span>
+                        <span style={{ color: '#c9a84c', fontSize: '11px' }}>Rs.{g.total.toLocaleString('en-IN')} {isOpen ? '▲' : '▼'}</span>
+                      </button>
+                      {isOpen && (
+                        <div style={{ padding: '8px 10px', background: 'rgba(0,0,0,0.2)' }}>
+                          <div style={{ ...s.revenueBarBg, marginBottom: '6px' }}>
+                            <div style={{ ...s.revenueBarFill, width: `${Math.min(100, Math.round((g.total / Math.max(1, totalRevenue || 1)) * 100))}%` }} />
+                          </div>
+                          <p style={{ color: '#8896a8', fontSize: '10px', margin: 0 }}>Share of loaded revenue</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               <div style={s.bottomCard}>
-                <h3 style={s.bottomTitle}>⚠️ Alerts & Notifications</h3>
-                {alerts.map((a, i) => (
-                  <div key={i} style={{ ...s.alertRow, borderLeft: `3px solid ${a.color}` }}>
-                    <p style={s.alertMsg}>{a.icon} {a.msg}</p>
-                    <p style={s.alertTime}>{a.time}</p>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                  <h3 style={{ ...s.bottomTitle, margin: 0 }}>⚠️ Alerts & Notifications</h3>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {['day', 'month'].map((mode) => (
+                      <button key={mode} onClick={() => setAlertsGroupMode(mode)} style={{ background: alertsGroupMode === mode ? 'rgba(109,190,255,0.2)' : 'rgba(109,190,255,0.08)', border: alertsGroupMode === mode ? '1px solid rgba(109,190,255,0.5)' : '1px solid rgba(109,190,255,0.28)', color: '#8dd3ff', borderRadius: '12px', padding: '2px 8px', fontSize: '10px', cursor: 'pointer' }}>{mode === 'day' ? 'Day-wise' : 'Month-wise'}</button>
+                    ))}
                   </div>
-                ))}
+                </div>
+                {alertsGroups.map((g) => {
+                  const isOpen = Boolean(openAlertsGroups[g.key]);
+                  return (
+                    <div key={g.key} style={{ border: '1px solid rgba(201,168,76,0.2)', borderRadius: '10px', marginBottom: '8px', overflow: 'hidden' }}>
+                      <button type="button" onClick={() => setOpenAlertsGroups((prev) => ({ ...prev, [g.key]: !prev[g.key] }))} style={{ width: '100%', background: 'rgba(0,0,0,0.25)', border: 'none', color: '#e8e0d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', cursor: 'pointer' }}>
+                        <span style={{ color: '#f2d78b', fontSize: '11px', fontWeight: 700 }}>{g.label}</span>
+                        <span style={{ color: '#8ea2b8', fontSize: '10px' }}>{g.rows.length} alerts {isOpen ? '▲' : '▼'}</span>
+                      </button>
+                      {isOpen && (
+                        <div style={{ padding: '8px' }}>
+                          {g.rows.map((a, i) => (
+                            <div key={`${g.key}-${i}`} style={{ ...s.alertRow, borderLeft: `3px solid ${a.color}` }}>
+                              <p style={s.alertMsg}>{a.icon} {a.msg}</p>
+                              <p style={s.alertTime}>{a.time}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 {issuesHasMore && (
                   <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
                     <button
@@ -1499,7 +1644,14 @@ const AdminDashboard = () => {
                 )}
               </div>
               <div style={s.bottomCard}>
-                <h3 style={s.bottomTitle}>📈 {t('rateLimitTelemetryTitle')}</h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap', marginBottom: '8px' }}>
+                  <h3 style={{ ...s.bottomTitle, margin: 0 }}>📈 {t('rateLimitTelemetryTitle')}</h3>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    {['day', 'month'].map((mode) => (
+                      <button key={mode} onClick={() => setTelemetryGroupMode(mode)} style={{ background: telemetryGroupMode === mode ? 'rgba(109,190,255,0.2)' : 'rgba(109,190,255,0.08)', border: telemetryGroupMode === mode ? '1px solid rgba(109,190,255,0.5)' : '1px solid rgba(109,190,255,0.28)', color: '#8dd3ff', borderRadius: '12px', padding: '2px 8px', fontSize: '10px', cursor: 'pointer' }}>{mode === 'day' ? 'Day-wise' : 'Month-wise'}</button>
+                    ))}
+                  </div>
+                </div>
                 <div style={{ display: 'grid', gridTemplateColumns: isSmall ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: '8px', marginBottom: '10px' }}>
                   <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px', textAlign: 'center', border: '1px solid rgba(76,175,80,0.28)' }}>
                     <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>{t('allowedText')}</p>
@@ -1556,6 +1708,27 @@ const AdminDashboard = () => {
                     {(apiHealthTelemetry.slo?.p95Healthy && apiHealthTelemetry.slo?.errorRateHealthy) ? t('sloHealthy') : t('sloBreachRisk')}
                   </p>
                 </div>
+                {telemetryGroups.map((g) => {
+                  const isOpen = Boolean(openTelemetryGroups[g.key]);
+                  const total = g.allowed + g.blocked;
+                  const localBlockedRate = total > 0 ? Math.round((g.blocked / total) * 100) : 0;
+                  return (
+                    <div key={g.key} style={{ border: '1px solid rgba(201,168,76,0.2)', borderRadius: '10px', marginBottom: '8px', overflow: 'hidden' }}>
+                      <button type="button" onClick={() => setOpenTelemetryGroups((prev) => ({ ...prev, [g.key]: !prev[g.key] }))} style={{ width: '100%', background: 'rgba(0,0,0,0.25)', border: 'none', color: '#e8e0d0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 10px', cursor: 'pointer' }}>
+                        <span style={{ display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                          <span style={{ color: '#f2d78b', fontSize: '11px', fontWeight: 700 }}>{g.label}</span>
+                          <span style={{ color: '#8ea2b8', fontSize: '10px' }}>snapshots: {g.rows.length}</span>
+                        </span>
+                        <span style={{ color: localBlockedRate >= 15 ? '#ff9aa8' : '#4CAF50', fontSize: '10px' }}>blocked {localBlockedRate}% {isOpen ? '▲' : '▼'}</span>
+                      </button>
+                      {isOpen && (
+                        <div style={{ padding: '8px', background: 'rgba(0,0,0,0.18)' }}>
+                          <p style={{ color: '#d2d8e2', fontSize: '11px', margin: '0 0 4px' }}>Allowed: {g.allowed} · Blocked: {g.blocked} · Peak buckets: {g.maxBuckets}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
                 {(rateTelemetry.byRoute || []).slice(0, 5).map((x) => (
                   <div key={x.route} style={s.alertRow}>
                     <p style={s.alertMsg}>{x.route}</p>
