@@ -3,14 +3,14 @@ import React, { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import LanguageSelector from '../components/LanguageSelector';
 import { useLanguage } from '../context/LanguageContext';
-import adminRoleImage360 from '../assets/roles/admin-card-360.jpg';
-import adminRoleImage720 from '../assets/roles/admin-card-720.jpg';
-import clientRoleImage360 from '../assets/roles/client-card-360.jpg';
-import clientRoleImage720 from '../assets/roles/client-card-720.jpg';
-import ownerRoleImage360 from '../assets/roles/owner-card-360.jpg';
-import ownerRoleImage720 from '../assets/roles/owner-card-720.jpg';
-import operatorRoleImage360 from '../assets/roles/operator-card-360.jpg';
-import operatorRoleImage720 from '../assets/roles/operator-card-720.jpg';
+import adminRoleImage74 from '../assets/roles/admin-74.jpg';
+import adminRoleImage148 from '../assets/roles/admin-148.jpg';
+import clientRoleImage74 from '../assets/roles/client-74.jpg';
+import clientRoleImage148 from '../assets/roles/client-148.jpg';
+import ownerRoleImage74 from '../assets/roles/owner-74.jpg';
+import ownerRoleImage148 from '../assets/roles/owner-148.jpg';
+import operatorRoleImage74 from '../assets/roles/operator-74.jpg';
+import operatorRoleImage148 from '../assets/roles/operator-148.jpg';
 
 const DEFAULT_SIGNUP = {
   name: '',
@@ -149,20 +149,20 @@ const Login = () => {
     {
       id: 'admin',
       label: 'Admin',
-      sub: 'Construction Development',
+      sub: 'Om Chavan — MD',
       image: {
-        src: adminRoleImage360,
-        srcSet: `${adminRoleImage360} 360w, ${adminRoleImage720} 720w`,
+        src: adminRoleImage74,
+        srcSet: `${adminRoleImage74} 74w, ${adminRoleImage148} 148w`,
       },
       fallback: 'A',
     },
     {
       id: 'client',
       label: 'Client',
-      sub: 'Project Stakeholder',
+      sub: 'Book Machinery',
       image: {
-        src: clientRoleImage360,
-        srcSet: `${clientRoleImage360} 360w, ${clientRoleImage720} 720w`,
+        src: clientRoleImage74,
+        srcSet: `${clientRoleImage74} 74w, ${clientRoleImage148} 148w`,
       },
       fallback: 'C',
     },
@@ -171,8 +171,8 @@ const Login = () => {
       label: 'Owner',
       sub: 'Machine Owner',
       image: {
-        src: ownerRoleImage360,
-        srcSet: `${ownerRoleImage360} 360w, ${ownerRoleImage720} 720w`,
+        src: ownerRoleImage74,
+        srcSet: `${ownerRoleImage74} 74w, ${ownerRoleImage148} 148w`,
       },
       fallback: 'O',
     },
@@ -181,8 +181,8 @@ const Login = () => {
       label: 'Operator',
       sub: 'Machine Operator',
       image: {
-        src: operatorRoleImage360,
-        srcSet: `${operatorRoleImage360} 360w, ${operatorRoleImage720} 720w`,
+        src: operatorRoleImage74,
+        srcSet: `${operatorRoleImage74} 74w, ${operatorRoleImage148} 148w`,
       },
       fallback: 'P',
     },
@@ -220,28 +220,12 @@ const Login = () => {
             transform-style: preserve-3d;
             will-change: transform, box-shadow;
             animation: role-float 6s ease-in-out infinite;
-            border-radius: 18px;
-          }
-          .premium-role-grid {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 14px;
-          }
-          @media (max-width: 1024px) {
-            .premium-role-grid {
-              grid-template-columns: repeat(2, minmax(0, 1fr));
-            }
-          }
-          @media (max-width: 620px) {
-            .premium-role-grid {
-              grid-template-columns: minmax(0, 1fr);
-            }
           }
           .premium-role-card::before {
             content: "";
             position: absolute;
             inset: -1px;
-            border-radius: 18px;
+            border-radius: 16px;
             background: conic-gradient(from 160deg, rgba(201,168,76,0), rgba(201,168,76,0.45), rgba(84,117,178,0.4), rgba(201,168,76,0));
             opacity: 0;
             transition: opacity 0.35s ease;
@@ -273,25 +257,17 @@ const Login = () => {
           .role-avatar {
             animation: avatar-drift 5.5s ease-in-out infinite;
           }
-          .role-title-wrap {
-            position: relative;
-            z-index: 2;
-            padding: 13px 14px 14px;
-            background: linear-gradient(180deg, rgba(3,8,18,0.12) 0%, rgba(3,8,18,0.84) 38%, rgba(2,6,14,0.96) 100%);
-            border-top: 1px solid rgba(255,255,255,0.06);
-            backdrop-filter: blur(8px);
-          }
           @keyframes role-float {
             0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-5px); }
+            50% { transform: translateY(-4px); }
           }
           @keyframes avatar-drift {
             0%, 100% { transform: translateY(0px) scale(1.0); }
             50% { transform: translateY(-3px) scale(1.02); }
           }
           @keyframes role-pulse {
-            0%, 100% { box-shadow: 0 0 0 rgba(201,168,76,0.24), 0 16px 36px rgba(5,13,26,0.58), inset 0 1px 0 rgba(255,255,255,0.12); }
-            50% { box-shadow: 0 0 34px rgba(201,168,76,0.40), 0 24px 42px rgba(5,13,26,0.7), inset 0 1px 0 rgba(255,255,255,0.22); }
+            0%, 100% { box-shadow: 0 0 0 rgba(201,168,76,0.18), 0 10px 28px rgba(5,13,26,0.55), inset 0 1px 0 rgba(255,255,255,0.12); }
+            50% { box-shadow: 0 0 28px rgba(201,168,76,0.32), 0 12px 34px rgba(5,13,26,0.65), inset 0 1px 0 rgba(255,255,255,0.18); }
           }
           @keyframes sheen {
             from { transform: translateX(-120%) rotate(4deg); }
@@ -341,7 +317,7 @@ const Login = () => {
           </div>
 
           <p style={s.label}>{t('selectRole')}:</p>
-          <div style={s.roleGrid} className="premium-role-grid">
+          <div style={s.roleGrid}>
             {ROLES.map(r => (
               <button key={r.id}
                 type="button"
@@ -362,13 +338,13 @@ const Login = () => {
                   <img
                     src={r.image.src}
                     srcSet={r.image.srcSet}
-                    sizes="(max-width: 620px) 92vw, (max-width: 1024px) 44vw, 23vw"
+                    sizes="(max-width: 520px) 64px, 74px"
                     alt={r.label}
                     loading={role === r.id ? 'eager' : 'lazy'}
                     fetchPriority={role === r.id ? 'high' : 'auto'}
                     decoding={role === r.id ? 'sync' : 'async'}
-                    width="360"
-                    height="220"
+                    width="74"
+                    height="74"
                     style={s.roleImage}
                     className="role-avatar"
                     onError={(event) => {
@@ -386,10 +362,8 @@ const Login = () => {
                     }}
                   ></span>
                 </div>
-                <div className="role-title-wrap">
-                  <span style={{ ...s.roleLabel, color: role === r.id ? '#f0cd77' : '#f2f4f8' }}>{r.label}</span>
-                  <span style={s.roleSub}>{r.sub}</span>
-                </div>
+                <span style={{ ...s.roleLabel, color: role === r.id ? '#c9a84c' : '#e8e0d0' }}>{r.label}</span>
+                <span style={s.roleSub}>{r.sub}</span>
               </button>
             ))}
           </div>
@@ -542,45 +516,44 @@ const s = {
   bgGrid: { position: 'fixed', inset: 0, backgroundImage: 'linear-gradient(rgba(201,168,76,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(201,168,76,0.03) 1px, transparent 1px)', backgroundSize: '50px 50px', pointerEvents: 'none' },
   bgGlow1: { position: 'fixed', top: '-20%', right: '-10%', width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)', pointerEvents: 'none' },
   bgGlow2: { position: 'fixed', bottom: '-20%', left: '-10%', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(10,22,40,0.9) 0%, transparent 70%)', pointerEvents: 'none' },
-  wrapper: { width: '100%', maxWidth: '1160px', position: 'relative', zIndex: 1 },
+  wrapper: { width: '100%', maxWidth: '520px', position: 'relative', zIndex: 1 },
   logoSection: { display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '24px', justifyContent: 'center' },
   logoCircle: { width: '56px', height: '56px', background: 'linear-gradient(135deg, #a07830, #e2c97e)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 0 30px rgba(201,168,76,0.4)' },
   logoText: { color: '#0a1628', fontWeight: '900', fontSize: '18px' },
   companyName: { color: '#c9a84c', fontSize: '18px', fontWeight: '900', margin: '0 0 3px', letterSpacing: '2px' },
   tagline: { color: 'rgba(201,168,76,0.6)', fontSize: '9px', margin: '0 0 2px', letterSpacing: '2px' },
   since: { color: '#8896a8', fontSize: '10px', margin: 0 },
-  card: { background: 'radial-gradient(circle at 14% 2%, rgba(31,55,102,0.72) 0%, rgba(11,22,42,0.92) 35%, rgba(6,13,26,0.98) 100%)', border: '1px solid rgba(201,168,76,0.38)', borderRadius: '24px', padding: '32px', boxShadow: '0 34px 96px rgba(0,0,0,0.64), 0 0 60px rgba(201,168,76,0.09), inset 0 1px 0 rgba(255,255,255,0.12)' },
+  card: { background: 'linear-gradient(135deg, #0f2040 0%, #0a1628 100%)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '20px', padding: '30px', boxShadow: '0 30px 80px rgba(0,0,0,0.6), inset 0 1px 0 rgba(201,168,76,0.1)' },
   cardHeader: { textAlign: 'center', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid rgba(201,168,76,0.1)' },
   cardTitle: { color: '#c9a84c', fontSize: '20px', fontWeight: '700', margin: '0 0 6px' },
   cardSub: { color: '#8896a8', fontSize: '12px', margin: 0 },
   label: { color: '#8896a8', fontSize: '11px', marginBottom: '8px', letterSpacing: '1px', display: 'block' },
-  roleGrid: { marginBottom: '18px' },
+  roleGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px', marginBottom: '16px' },
   roleBtn: {
-    background: 'linear-gradient(165deg, rgba(19,35,66,0.68) 0%, rgba(8,16,31,0.93) 100%)',
-    border: '1px solid rgba(201,168,76,0.27)',
-    borderRadius: '18px',
-    padding: 0,
+    background: 'linear-gradient(160deg, rgba(24,38,69,0.65) 0%, rgba(8,16,30,0.86) 100%)',
+    border: '1px solid rgba(201,168,76,0.26)',
+    borderRadius: '16px',
+    padding: '12px 8px 10px',
     cursor: 'pointer',
-    textAlign: 'left',
+    textAlign: 'center',
     transition: 'transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease, background 0.28s ease',
-    backdropFilter: 'blur(12px)',
-    WebkitBackdropFilter: 'blur(12px)',
-    boxShadow: '0 16px 36px rgba(0,0,0,0.52), inset 0 1px 0 rgba(255,255,255,0.07)',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)',
     isolation: 'isolate',
-    minHeight: '258px',
   },
   roleBtnActive: {
-    background: 'linear-gradient(165deg, rgba(36,59,102,0.82) 0%, rgba(10,19,36,0.95) 100%)',
-    border: '1px solid rgba(201,168,76,0.75)',
-    boxShadow: '0 0 30px rgba(201,168,76,0.34), 0 20px 40px rgba(0,0,0,0.62), inset 0 1px 0 rgba(255,255,255,0.17)',
+    background: 'linear-gradient(165deg, rgba(35,56,94,0.82) 0%, rgba(9,18,34,0.92) 100%)',
+    border: '1px solid rgba(201,168,76,0.65)',
+    boxShadow: '0 0 24px rgba(201,168,76,0.25), 0 12px 34px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.15)',
   },
-  roleImageWrap: { position: 'relative', width: '100%', height: '178px', margin: 0, borderRadius: '18px 18px 0 0', overflow: 'hidden', borderBottom: '1px solid rgba(201,168,76,0.22)', boxShadow: 'inset 0 -30px 70px rgba(2,6,14,0.45)', zIndex: 1 },
-  roleImage: { width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'saturate(1.12) contrast(1.08) brightness(0.93)' },
+  roleImageWrap: { position: 'relative', width: '74px', height: '74px', margin: '0 auto 8px', borderRadius: '22px', overflow: 'hidden', border: '1px solid rgba(201,168,76,0.5)', boxShadow: '0 8px 24px rgba(201,168,76,0.18), inset 0 0 0 1px rgba(255,255,255,0.08)', zIndex: 1 },
+  roleImage: { width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'saturate(1.05) contrast(1.05)' },
   roleImageFallback: { position: 'absolute', inset: 0, display: 'none', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #2d436e, #0a1628)', color: '#f2d78b', fontSize: '24px', fontWeight: '800' },
-  roleGlow: { position: 'absolute', inset: '-16%', background: 'radial-gradient(circle at 50% 25%, rgba(201,168,76,0.24), rgba(12,24,45,0.12) 45%, transparent 72%)', pointerEvents: 'none' },
+  roleGlow: { position: 'absolute', inset: '-14%', background: 'radial-gradient(circle at 55% 30%, rgba(201,168,76,0.30), transparent 60%)', pointerEvents: 'none' },
   roleReflection: { position: 'absolute', inset: 0, pointerEvents: 'none', transition: 'background 0.12s linear' },
-  roleLabel: { fontSize: '15px', fontWeight: '800', display: 'block', marginBottom: '5px', letterSpacing: '0.3px' },
-  roleSub: { color: '#aebacf', fontSize: '11px', display: 'block', letterSpacing: '0.3px' },
+  roleLabel: { fontSize: '12px', fontWeight: '700', display: 'block', marginBottom: '2px' },
+  roleSub: { color: '#9ca8b7', fontSize: '9px', display: 'block' },
   selectedBadge: { display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: '8px', padding: '8px 12px', marginBottom: '18px' },
   selectedDot: { width: '6px', height: '6px', background: '#4CAF50', borderRadius: '50%', flexShrink: 0 },
   selectedText: { color: '#8896a8', fontSize: '12px' },
