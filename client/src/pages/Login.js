@@ -1,8 +1,16 @@
 // import { requestNotificationPermission } from '../firebase';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import LanguageSelector from '../components/LanguageSelector';
 import { useLanguage } from '../context/LanguageContext';
+import adminRoleImage74 from '../assets/roles/admin-74.jpg';
+import adminRoleImage148 from '../assets/roles/admin-148.jpg';
+import clientRoleImage74 from '../assets/roles/client-74.jpg';
+import clientRoleImage148 from '../assets/roles/client-148.jpg';
+import ownerRoleImage74 from '../assets/roles/owner-74.jpg';
+import ownerRoleImage148 from '../assets/roles/owner-148.jpg';
+import operatorRoleImage74 from '../assets/roles/operator-74.jpg';
+import operatorRoleImage148 from '../assets/roles/operator-148.jpg';
 
 const DEFAULT_SIGNUP = {
   name: '',
@@ -31,6 +39,10 @@ const Login = () => {
   const [signupLoading, setSignupLoading] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
   const [showSignupConfirmPassword, setShowSignupConfirmPassword] = useState(false);
+  const [hoveredRole, setHoveredRole] = useState(null);
+  const [roleTilt, setRoleTilt] = useState({});
+  const [roleLight, setRoleLight] = useState({});
+  const moveRafRef = useRef(null);
   const loginUsesPhone = role !== 'admin';
 
   const normalizePhone = (value) => value.replace(/\D/g, '').slice(-10);
@@ -134,14 +146,148 @@ const Login = () => {
   };
 
   const ROLES = [
-    { id: 'admin', icon: '👑', label: 'Admin', sub: 'Om Chavan — MD' },
-    { id: 'client', icon: '👷', label: 'Client', sub: 'Book Machinery' },
-    { id: 'owner', icon: '🏗️', label: 'Owner', sub: 'Machine Owner' },
-    { id: 'operator', icon: '🔧', label: 'Operator', sub: 'Machine Operator' },
+    {
+      id: 'admin',
+      label: 'Admin',
+      sub: 'Om Chavan — MD',
+      image: {
+        src: adminRoleImage74,
+        srcSet: `${adminRoleImage74} 74w, ${adminRoleImage148} 148w`,
+      },
+      fallback: 'A',
+    },
+    {
+      id: 'client',
+      label: 'Client',
+      sub: 'Book Machinery',
+      image: {
+        src: clientRoleImage74,
+        srcSet: `${clientRoleImage74} 74w, ${clientRoleImage148} 148w`,
+      },
+      fallback: 'C',
+    },
+    {
+      id: 'owner',
+      label: 'Owner',
+      sub: 'Machine Owner',
+      image: {
+        src: ownerRoleImage74,
+        srcSet: `${ownerRoleImage74} 74w, ${ownerRoleImage148} 148w`,
+      },
+      fallback: 'O',
+    },
+    {
+      id: 'operator',
+      label: 'Operator',
+      sub: 'Machine Operator',
+      image: {
+        src: operatorRoleImage74,
+        srcSet: `${operatorRoleImage74} 74w, ${operatorRoleImage148} 148w`,
+      },
+      fallback: 'P',
+    },
   ];
+
+  const handleRoleMove = (id, event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - rect.left) / rect.width;
+    const y = (event.clientY - rect.top) / rect.height;
+    const rotateY = (x - 0.5) * 8;
+    const rotateX = (0.5 - y) * 8;
+    const lightX = Math.max(0, Math.min(100, x * 100));
+    const lightY = Math.max(0, Math.min(100, y * 100));
+    if (moveRafRef.current) {
+      cancelAnimationFrame(moveRafRef.current);
+    }
+    moveRafRef.current = requestAnimationFrame(() => {
+      setRoleTilt(prev => ({ ...prev, [id]: { rotateX, rotateY } }));
+      setRoleLight(prev => ({ ...prev, [id]: { lightX, lightY } }));
+    });
+  };
+
+  const resetRoleTilt = (id) => {
+    setRoleTilt(prev => ({ ...prev, [id]: { rotateX: 0, rotateY: 0 } }));
+    setRoleLight(prev => ({ ...prev, [id]: { lightX: 50, lightY: 12 } }));
+  };
 
   return (
     <div style={s.page}>
+      <style>
+        {`
+          .premium-role-card {
+            position: relative;
+            overflow: hidden;
+            transform-style: preserve-3d;
+            will-change: transform, box-shadow;
+            animation: role-float 6s ease-in-out infinite;
+          }
+          .premium-role-card::before {
+            content: "";
+            position: absolute;
+            inset: -1px;
+            border-radius: 16px;
+            background: conic-gradient(from 160deg, rgba(201,168,76,0), rgba(201,168,76,0.45), rgba(84,117,178,0.4), rgba(201,168,76,0));
+            opacity: 0;
+            transition: opacity 0.35s ease;
+            pointer-events: none;
+            z-index: 0;
+          }
+          .premium-role-card:hover::before,
+          .premium-role-card-active::before {
+            opacity: 0.65;
+          }
+          .premium-role-card::after {
+            content: "";
+            position: absolute;
+            inset: -10% -70%;
+            background: linear-gradient(110deg, transparent 35%, rgba(255,255,255,0.22) 50%, transparent 65%);
+            transform: translateX(-120%) rotate(4deg);
+            pointer-events: none;
+          }
+          .premium-role-card:hover::after {
+            animation: sheen 1.2s ease;
+          }
+          .premium-role-card-active {
+            animation: role-float 6s ease-in-out infinite, role-pulse 2.2s ease-in-out infinite;
+          }
+          .premium-role-card:focus-visible {
+            outline: 2px solid rgba(242,215,139,0.75);
+            outline-offset: 3px;
+          }
+          .role-avatar {
+            animation: avatar-drift 5.5s ease-in-out infinite;
+          }
+          @keyframes role-float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-4px); }
+          }
+          @keyframes avatar-drift {
+            0%, 100% { transform: translateY(0px) scale(1.0); }
+            50% { transform: translateY(-3px) scale(1.02); }
+          }
+          @keyframes role-pulse {
+            0%, 100% { box-shadow: 0 0 0 rgba(201,168,76,0.18), 0 10px 28px rgba(5,13,26,0.55), inset 0 1px 0 rgba(255,255,255,0.12); }
+            50% { box-shadow: 0 0 28px rgba(201,168,76,0.32), 0 12px 34px rgba(5,13,26,0.65), inset 0 1px 0 rgba(255,255,255,0.18); }
+          }
+          @keyframes sheen {
+            from { transform: translateX(-120%) rotate(4deg); }
+            to { transform: translateX(120%) rotate(4deg); }
+          }
+          @media (prefers-reduced-motion: reduce) {
+            .premium-role-card,
+            .premium-role-card-active,
+            .role-avatar {
+              animation: none !important;
+            }
+          }
+          @media (hover: none), (pointer: coarse) {
+            .premium-role-card::after,
+            .premium-role-card::before {
+              display: none;
+            }
+          }
+        `}
+      </style>
       <div style={s.bgGrid}></div>
       <div style={s.bgGlow1}></div>
       <div style={s.bgGlow2}></div>
@@ -174,9 +320,48 @@ const Login = () => {
           <div style={s.roleGrid}>
             {ROLES.map(r => (
               <button key={r.id}
-                style={{ ...s.roleBtn, ...(role === r.id ? s.roleBtnActive : {}) }}
+                type="button"
+                className={`premium-role-card ${role === r.id ? 'premium-role-card-active' : ''}`}
+                style={{
+                  ...s.roleBtn,
+                  ...(role === r.id ? s.roleBtnActive : {}),
+                  transform: `perspective(700px) rotateX(${roleTilt[r.id]?.rotateX || 0}deg) rotateY(${roleTilt[r.id]?.rotateY || 0}deg) scale(${hoveredRole === r.id ? 1.03 : 1})`,
+                  zIndex: hoveredRole === r.id || role === r.id ? 2 : 1,
+                }}
+                onMouseEnter={() => setHoveredRole(r.id)}
+                onMouseLeave={() => { setHoveredRole(null); resetRoleTilt(r.id); }}
+                onFocus={() => setHoveredRole(r.id)}
+                onBlur={() => { setHoveredRole(null); resetRoleTilt(r.id); }}
+                onMouseMove={(event) => handleRoleMove(r.id, event)}
                 onClick={() => { setRole(r.id); setError(''); setIdentifier(''); }}>
-                <span style={s.roleIcon}>{r.icon}</span>
+                <div style={s.roleImageWrap}>
+                  <img
+                    src={r.image.src}
+                    srcSet={r.image.srcSet}
+                    sizes="(max-width: 520px) 64px, 74px"
+                    alt={r.label}
+                    loading={role === r.id ? 'eager' : 'lazy'}
+                    fetchPriority={role === r.id ? 'high' : 'auto'}
+                    decoding={role === r.id ? 'sync' : 'async'}
+                    width="74"
+                    height="74"
+                    style={s.roleImage}
+                    className="role-avatar"
+                    onError={(event) => {
+                      event.currentTarget.style.display = 'none';
+                      const fallback = event.currentTarget.nextSibling;
+                      if (fallback) fallback.style.display = 'flex';
+                    }}
+                  />
+                  <span style={s.roleImageFallback}>{r.fallback}</span>
+                  <span style={s.roleGlow}></span>
+                  <span
+                    style={{
+                      ...s.roleReflection,
+                      background: `radial-gradient(circle at ${roleLight[r.id]?.lightX ?? 50}% ${roleLight[r.id]?.lightY ?? 12}%, rgba(255,255,255,0.42), rgba(255,255,255,0.10) 28%, transparent 62%)`,
+                    }}
+                  ></span>
+                </div>
                 <span style={{ ...s.roleLabel, color: role === r.id ? '#c9a84c' : '#e8e0d0' }}>{r.label}</span>
                 <span style={s.roleSub}>{r.sub}</span>
               </button>
@@ -343,12 +528,32 @@ const s = {
   cardTitle: { color: '#c9a84c', fontSize: '20px', fontWeight: '700', margin: '0 0 6px' },
   cardSub: { color: '#8896a8', fontSize: '12px', margin: 0 },
   label: { color: '#8896a8', fontSize: '11px', marginBottom: '8px', letterSpacing: '1px', display: 'block' },
-  roleGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px', marginBottom: '14px' },
-  roleBtn: { background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: '10px', padding: '10px 6px', cursor: 'pointer', textAlign: 'center', transition: 'all 0.2s' },
-  roleBtnActive: { background: 'rgba(201,168,76,0.12)', border: '2px solid #c9a84c', boxShadow: '0 0 15px rgba(201,168,76,0.2)' },
-  roleIcon: { fontSize: '22px', display: 'block', marginBottom: '4px' },
+  roleGrid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '10px', marginBottom: '16px' },
+  roleBtn: {
+    background: 'linear-gradient(160deg, rgba(24,38,69,0.65) 0%, rgba(8,16,30,0.86) 100%)',
+    border: '1px solid rgba(201,168,76,0.26)',
+    borderRadius: '16px',
+    padding: '12px 8px 10px',
+    cursor: 'pointer',
+    textAlign: 'center',
+    transition: 'transform 0.28s ease, box-shadow 0.28s ease, border-color 0.28s ease, background 0.28s ease',
+    backdropFilter: 'blur(10px)',
+    WebkitBackdropFilter: 'blur(10px)',
+    boxShadow: '0 10px 30px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.06)',
+    isolation: 'isolate',
+  },
+  roleBtnActive: {
+    background: 'linear-gradient(165deg, rgba(35,56,94,0.82) 0%, rgba(9,18,34,0.92) 100%)',
+    border: '1px solid rgba(201,168,76,0.65)',
+    boxShadow: '0 0 24px rgba(201,168,76,0.25), 0 12px 34px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.15)',
+  },
+  roleImageWrap: { position: 'relative', width: '74px', height: '74px', margin: '0 auto 8px', borderRadius: '22px', overflow: 'hidden', border: '1px solid rgba(201,168,76,0.5)', boxShadow: '0 8px 24px rgba(201,168,76,0.18), inset 0 0 0 1px rgba(255,255,255,0.08)', zIndex: 1 },
+  roleImage: { width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'saturate(1.05) contrast(1.05)' },
+  roleImageFallback: { position: 'absolute', inset: 0, display: 'none', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #2d436e, #0a1628)', color: '#f2d78b', fontSize: '24px', fontWeight: '800' },
+  roleGlow: { position: 'absolute', inset: '-14%', background: 'radial-gradient(circle at 55% 30%, rgba(201,168,76,0.30), transparent 60%)', pointerEvents: 'none' },
+  roleReflection: { position: 'absolute', inset: 0, pointerEvents: 'none', transition: 'background 0.12s linear' },
   roleLabel: { fontSize: '12px', fontWeight: '700', display: 'block', marginBottom: '2px' },
-  roleSub: { color: '#8896a8', fontSize: '9px', display: 'block' },
+  roleSub: { color: '#9ca8b7', fontSize: '9px', display: 'block' },
   selectedBadge: { display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: '8px', padding: '8px 12px', marginBottom: '18px' },
   selectedDot: { width: '6px', height: '6px', background: '#4CAF50', borderRadius: '50%', flexShrink: 0 },
   selectedText: { color: '#8896a8', fontSize: '12px' },
