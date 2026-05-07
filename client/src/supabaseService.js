@@ -480,7 +480,7 @@ export const getDlqItems = async (filters = {}) => {
       error: '',
     };
   } catch (error) {
-    console.error(error);
+    if (!isAuthRequiredError(error)) console.error(error);
     return { items: [], counters: {}, nextCursor: null, hasMore: false, error: error?.message || 'Failed to fetch DLQ items' };
   }
 };
@@ -493,7 +493,7 @@ export const retryDlqItem = async (id, reason = '') => {
     });
     return true;
   } catch (error) {
-    console.error(error);
+    if (!isAuthRequiredError(error)) console.error(error);
     return false;
   }
 };
@@ -502,8 +502,8 @@ export const getDlqStats = async () => {
   try {
     return await secureFetch('/api/admin/dlq/stats');
   } catch (error) {
-    console.error(error);
-    return { totalLast24h: 0, failedLast24h: 0, retriedLast24h: 0, queueCounts: {}, hourly: [] };
+    if (!isAuthRequiredError(error)) console.error(error);
+    return { totalLast24h: 0, failedLast24h: 0, retriedLast24h: 0, queueCounts: {}, hourly: [], error: error?.message || 'Failed to fetch DLQ stats' };
   }
 };
 
