@@ -186,6 +186,8 @@ const AdminDashboard = () => {
   const [dlqCounters, setDlqCounters] = useState({});
   const [dlqQueueFilter, setDlqQueueFilter] = useState('');
   const [dlqStatusFilter, setDlqStatusFilter] = useState('');
+  const [isDlqQueueOpen, setIsDlqQueueOpen] = useState(false);
+  const [isDlqStatusOpen, setIsDlqStatusOpen] = useState(false);
   const [dlqCursor, setDlqCursor] = useState(null);
   const [dlqHasMore, setDlqHasMore] = useState(false);
   const [dlqLoadingMore, setDlqLoadingMore] = useState(false);
@@ -229,6 +231,8 @@ const AdminDashboard = () => {
   const [failedLogins, setFailedLogins] = useState([]);
   const [securityRefreshing, setSecurityRefreshing] = useState(false);
   const [securitySeverityFilter, setSecuritySeverityFilter] = useState('ALL');
+  const [securityGroupMode, setSecurityGroupMode] = useState('day');
+  const [openSecurityGroups, setOpenSecurityGroups] = useState({});
   const [acknowledgedSignalIds, setAcknowledgedSignalIds] = useState({});
   const [securityLastRefreshedAt, setSecurityLastRefreshedAt] = useState(null);
   const [securityNow, setSecurityNow] = useState(Date.now());
@@ -470,7 +474,6 @@ const AdminDashboard = () => {
     const timer = setInterval(() => setSecurityNow(Date.now()), 10000);
     return () => clearInterval(timer);
   }, []);
-
   useEffect(() => {
     if (loading || activeTab !== 'dlq') return;
     Promise.all([
@@ -887,6 +890,43 @@ const AdminDashboard = () => {
     () => (securitySignals || []).filter((row) => row?.action === 'security.api_slo_breach').slice(0, 5),
     [securitySignals],
   );
+  const securitySignalGroups = useMemo(() => {
+    const bucket = {};
+    (visibleSecuritySignals || []).forEach((row) => {
+      const created = row?.created_at ? new Date(row.created_at) : null;
+      const key = created
+        ? (securityGroupMode === 'month'
+          ? `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}`
+          : `${created.getFullYear()}-${String(created.getMonth() + 1).padStart(2, '0')}-${String(created.getDate()).padStart(2, '0')}`)
+        : 'unknown';
+      if (!bucket[key]) bucket[key] = [];
+      bucket[key].push(row);
+    });
+    return Object.entries(bucket)
+      .sort((a, b) => String(b[0]).localeCompare(String(a[0])))
+      .map(([key, rows]) => {
+        const label = key === 'unknown'
+          ? 'Unknown Time'
+          : (securityGroupMode === 'month'
+            ? new Date(`${key}-01T00:00:00`).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })
+            : new Date(`${key}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }));
+        const high = rows.filter((x) => ((x?.metadata?.severity || (x.action?.includes('retry_burst') ? 'HIGH' : 'MEDIUM')) === 'HIGH')).length;
+        return { key, label, rows, high };
+      });
+  }, [visibleSecuritySignals, securityGroupMode]);
+  useEffect(() => {
+    if (!securitySignalGroups.length) {
+      setOpenSecurityGroups({});
+      return;
+    }
+    setOpenSecurityGroups((prev) => {
+      const next = {};
+      securitySignalGroups.forEach((g, idx) => {
+        next[g.key] = Object.prototype.hasOwnProperty.call(prev, g.key) ? prev[g.key] : idx === 0;
+      });
+      return next;
+    });
+  }, [securitySignalGroups]);
   const exportSecuritySignalsCsv = () => {
     if (visibleSecuritySignals.length === 0) return;
     const header = ['signal_id', 'action', 'severity', 'created_at', 'acknowledged', 'acknowledged_by', 'acknowledged_at'];
@@ -1200,7 +1240,7 @@ const AdminDashboard = () => {
               <div style={s.bottomCard}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                   <h3 style={{ ...s.bottomTitle, margin: 0 }}>🛡️ {t('securitySignalsTitle')}</h3>
-                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                     {['ALL', 'HIGH', 'MEDIUM'].map((level) => (
                       <button
                         key={level}
@@ -1216,6 +1256,26 @@ const AdminDashboard = () => {
                         onClick={() => setSecuritySeverityFilter(level)}
                       >
                         {level}
+                      </button>
+                    ))}
+                    {[
+                      { id: 'day', label: 'Day' },
+                      { id: 'month', label: 'Month' },
+                    ].map((mode) => (
+                      <button
+                        key={mode.id}
+                        style={{
+                          background: securityGroupMode === mode.id ? 'rgba(109,190,255,0.2)' : 'rgba(109,190,255,0.08)',
+                          border: securityGroupMode === mode.id ? '1px solid rgba(109,190,255,0.5)' : '1px solid rgba(109,190,255,0.28)',
+                          color: '#8dd3ff',
+                          borderRadius: '12px',
+                          padding: '2px 8px',
+                          fontSize: '10px',
+                          cursor: 'pointer',
+                        }}
+                        onClick={() => setSecurityGroupMode(mode.id)}
+                      >
+                        {mode.label}
                       </button>
                     ))}
                     <button
@@ -1259,53 +1319,76 @@ const AdminDashboard = () => {
                         <p style={{ color: '#FFB74D', fontSize: '10px', margin: '4px 0 0' }}>{mediumCount}</p>
                       </div>
                     </div>
-                  {visibleSecuritySignals.map((row) => {
-                    const severity = row?.metadata?.severity || (row.action?.includes('retry_burst') ? 'HIGH' : 'MEDIUM');
-                    const ackInfo = acknowledgedSignalIds[row.id];
-                    const isAcked = Boolean(ackInfo?.acknowledged);
+                  {securitySignalGroups.map((group) => {
+                    const isOpen = Boolean(openSecurityGroups[group.key]);
                     return (
-                    <div key={row.id} style={s.alertRow}>
-                      <p style={s.alertMsg}>
-                        {row.action}
-                        <span style={{
-                          marginLeft: '8px',
-                          fontSize: '10px',
-                          padding: '2px 6px',
-                          borderRadius: '10px',
-                          border: severity === 'HIGH' ? '1px solid rgba(233,69,96,0.45)' : '1px solid rgba(255,152,0,0.45)',
-                          color: severity === 'HIGH' ? '#ff9aa8' : '#FFB74D',
-                          background: severity === 'HIGH' ? 'rgba(233,69,96,0.14)' : 'rgba(255,152,0,0.14)',
-                        }}>
-                          {severity}
-                        </span>
-                      </p>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-                        <p style={s.alertTime}>
-                          {row.created_at ? new Date(row.created_at).toLocaleString('en-IN') : '-'}
-                          {isAcked ? ` | Ack: ${ackInfo?.actorId || '-'} @ ${ackInfo?.acknowledgedAt ? new Date(ackInfo.acknowledgedAt).toLocaleString('en-IN') : '-'}` : ''}
-                        </p>
+                      <div key={group.key} style={{ border: '1px solid rgba(201,168,76,0.22)', borderRadius: '10px', marginBottom: '8px', background: 'rgba(0,0,0,0.2)' }}>
                         <button
-                          style={{ background: isAcked ? 'rgba(76,175,80,0.18)' : 'rgba(201,168,76,0.12)', border: isAcked ? '1px solid rgba(76,175,80,0.45)' : '1px solid rgba(201,168,76,0.35)', color: isAcked ? '#4CAF50' : '#c9a84c', borderRadius: '6px', padding: '3px 8px', fontSize: '10px', cursor: isAcked ? 'default' : 'pointer' }}
-                          disabled={isAcked}
-                          onClick={async () => {
-                            const ackResult = await acknowledgeSecuritySignal(row.id);
-                            if (ackResult.ok) {
-                              setAcknowledgedSignalIds((prev) => ({
-                                ...prev,
-                                [row.id]: {
-                                  acknowledged: true,
-                                  actorId: ackResult.acknowledgedBy || getCurrentAdminId(),
-                                  acknowledgedAt: ackResult.acknowledgedAt || new Date().toISOString(),
-                                },
-                              }));
-                              refreshSecurityPanel();
-                            }
-                          }}
+                          type="button"
+                          onClick={() => setOpenSecurityGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] }))}
+                          style={{ width: '100%', background: 'linear-gradient(165deg, rgba(16,30,48,0.9), rgba(9,16,28,0.92))', border: 'none', borderBottom: isOpen ? '1px solid rgba(201,168,76,0.2)' : 'none', color: '#e8e0d0', borderRadius: isOpen ? '10px 10px 0 0' : '10px', padding: '9px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}
                         >
-                          {isAcked ? t('acknowledgedText') : t('acknowledgeText')}
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ color: '#f3db99', fontWeight: 700, fontSize: '12px' }}>{group.label}</span>
+                            <span style={{ color: '#8ea2b8', fontSize: '10px' }}>{group.rows.length} signals</span>
+                            {group.high > 0 && <span style={{ color: '#ff9aa8', fontSize: '10px', border: '1px solid rgba(233,69,96,0.4)', borderRadius: '999px', padding: '1px 6px', background: 'rgba(233,69,96,0.12)' }}>High {group.high}</span>}
+                          </span>
+                          <span style={{ color: '#c9a84c', fontSize: '11px' }}>{isOpen ? '▲' : '▼'}</span>
                         </button>
+                        {isOpen && (
+                          <div style={{ padding: '8px' }}>
+                            {group.rows.map((row) => {
+                              const severity = row?.metadata?.severity || (row.action?.includes('retry_burst') ? 'HIGH' : 'MEDIUM');
+                              const ackInfo = acknowledgedSignalIds[row.id];
+                              const isAcked = Boolean(ackInfo?.acknowledged);
+                              return (
+                                <div key={row.id} style={s.alertRow}>
+                                  <p style={s.alertMsg}>
+                                    {row.action}
+                                    <span style={{
+                                      marginLeft: '8px',
+                                      fontSize: '10px',
+                                      padding: '2px 6px',
+                                      borderRadius: '10px',
+                                      border: severity === 'HIGH' ? '1px solid rgba(233,69,96,0.45)' : '1px solid rgba(255,152,0,0.45)',
+                                      color: severity === 'HIGH' ? '#ff9aa8' : '#FFB74D',
+                                      background: severity === 'HIGH' ? 'rgba(233,69,96,0.14)' : 'rgba(255,152,0,0.14)',
+                                    }}>
+                                      {severity}
+                                    </span>
+                                  </p>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                                    <p style={s.alertTime}>
+                                      {row.created_at ? new Date(row.created_at).toLocaleString('en-IN') : '-'}
+                                      {isAcked ? ` | Ack: ${ackInfo?.actorId || '-'} @ ${ackInfo?.acknowledgedAt ? new Date(ackInfo.acknowledgedAt).toLocaleString('en-IN') : '-'}` : ''}
+                                    </p>
+                                    <button
+                                      style={{ background: isAcked ? 'rgba(76,175,80,0.18)' : 'rgba(201,168,76,0.12)', border: isAcked ? '1px solid rgba(76,175,80,0.45)' : '1px solid rgba(201,168,76,0.35)', color: isAcked ? '#4CAF50' : '#c9a84c', borderRadius: '6px', padding: '3px 8px', fontSize: '10px', cursor: isAcked ? 'default' : 'pointer' }}
+                                      disabled={isAcked}
+                                      onClick={async () => {
+                                        const ackResult = await acknowledgeSecuritySignal(row.id);
+                                        if (ackResult.ok) {
+                                          setAcknowledgedSignalIds((prev) => ({
+                                            ...prev,
+                                            [row.id]: {
+                                              acknowledged: true,
+                                              actorId: ackResult.acknowledgedBy || getCurrentAdminId(),
+                                              acknowledgedAt: ackResult.acknowledgedAt || new Date().toISOString(),
+                                            },
+                                          }));
+                                          refreshSecurityPanel();
+                                        }
+                                      }}
+                                    >
+                                      {isAcked ? t('acknowledgedText') : t('acknowledgeText')}
+                                    </button>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    </div>
                     );
                   })}
                   <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(201,168,76,0.15)' }}>
@@ -1752,19 +1835,67 @@ const AdminDashboard = () => {
                 </div>
               ))}
             </div>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-              <select value={dlqQueueFilter} onChange={(e) => setDlqQueueFilter(e.target.value)} style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}>
-                <option value="">All Queues</option>
-                <option value="whatsapp">whatsapp</option>
-                <option value="email">email</option>
-                <option value="alert">alert</option>
-                <option value="pdf">pdf</option>
-              </select>
-              <select value={dlqStatusFilter} onChange={(e) => setDlqStatusFilter(e.target.value)} style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}>
-                <option value="">All Status</option>
-                <option value="failed">failed</option>
-                <option value="retried">retried</option>
-              </select>
+            <div style={{ position: 'relative', display: 'flex', gap: '10px', marginBottom: '12px', flexWrap: 'wrap', padding: '12px', border: '1px solid rgba(245,216,138,0.28)', borderRadius: '12px', background: 'radial-gradient(circle at 8% -45%, rgba(245,216,138,0.2), transparent 34%), linear-gradient(168deg, rgba(20,36,58,0.8), rgba(7,14,25,0.9))' }}>
+              <div style={{ position: 'relative', minWidth: '170px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDlqQueueOpen((v) => !v);
+                    setIsDlqStatusOpen(false);
+                  }}
+                  style={{ ...auditCmdInputStyle, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                >
+                  <span>{dlqQueueFilter || 'All Queues'}</span>
+                  <span style={{ color: '#f5d88a', fontSize: '11px', transform: isDlqQueueOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 200ms ease' }}>▼</span>
+                </button>
+                {isDlqQueueOpen && (
+                  <div style={{ position: 'absolute', top: '110%', left: 0, right: 0, zIndex: 40, borderRadius: '10px', border: '1px solid rgba(201,168,76,0.42)', background: 'linear-gradient(165deg, rgba(12,24,40,0.98), rgba(6,12,22,0.99))', boxShadow: '0 14px 30px rgba(0,0,0,0.42)' }}>
+                    {['', 'whatsapp', 'email', 'alert', 'pdf'].map((queue) => (
+                      <button
+                        key={queue || 'all'}
+                        type="button"
+                        onClick={() => {
+                          setDlqQueueFilter(queue);
+                          setIsDlqQueueOpen(false);
+                        }}
+                        style={{ width: '100%', textAlign: 'left', border: 'none', background: dlqQueueFilter === queue ? 'rgba(201,168,76,0.2)' : 'transparent', color: dlqQueueFilter === queue ? '#f7df9b' : '#d2d8e2', padding: '8px 10px', cursor: 'pointer', fontSize: '12px' }}
+                      >
+                        {queue || 'All Queues'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div style={{ position: 'relative', minWidth: '160px' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsDlqStatusOpen((v) => !v);
+                    setIsDlqQueueOpen(false);
+                  }}
+                  style={{ ...auditCmdInputStyle, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                >
+                  <span>{dlqStatusFilter || 'All Status'}</span>
+                  <span style={{ color: '#f5d88a', fontSize: '11px', transform: isDlqStatusOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 200ms ease' }}>▼</span>
+                </button>
+                {isDlqStatusOpen && (
+                  <div style={{ position: 'absolute', top: '110%', left: 0, right: 0, zIndex: 40, borderRadius: '10px', border: '1px solid rgba(201,168,76,0.42)', background: 'linear-gradient(165deg, rgba(12,24,40,0.98), rgba(6,12,22,0.99))', boxShadow: '0 14px 30px rgba(0,0,0,0.42)' }}>
+                    {['', 'failed', 'retried'].map((status) => (
+                      <button
+                        key={status || 'all'}
+                        type="button"
+                        onClick={() => {
+                          setDlqStatusFilter(status);
+                          setIsDlqStatusOpen(false);
+                        }}
+                        style={{ width: '100%', textAlign: 'left', border: 'none', background: dlqStatusFilter === status ? 'rgba(201,168,76,0.2)' : 'transparent', color: dlqStatusFilter === status ? '#f7df9b' : '#d2d8e2', padding: '8px 10px', cursor: 'pointer', fontSize: '12px' }}
+                      >
+                        {status || 'All Status'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
             <div style={{ marginBottom: '12px' }}>
               <p style={{ color: '#8896a8', fontSize: '11px', margin: '0 0 6px' }}>Last 24h Queue Volume</p>
