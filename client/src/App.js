@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { LanguageProvider } from './context/LanguageContext';
-import MarketingPage from './pages/MarketingPage';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import OwnerDashboard from './pages/OwnerDashboard';
@@ -100,13 +99,13 @@ function App() {
     <LanguageProvider>
       <Router>
         <Routes>
-          <Route path="/" element={<MarketingPage />} />
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/admin" element={<ProtectedRoute role="admin" authReady={authReady} user={sessionUser}><AdminDashboard /></ProtectedRoute>} />
           <Route path="/owner" element={<ProtectedRoute role="owner" authReady={authReady} user={sessionUser}><OwnerDashboard /></ProtectedRoute>} />
           <Route path="/client" element={<ProtectedRoute role="client" authReady={authReady} user={sessionUser}><ClientDashboard /></ProtectedRoute>} />
           <Route path="/operator" element={<ProtectedRoute role="operator" authReady={authReady} user={sessionUser}><OperatorDashboard /></ProtectedRoute>} />
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </Router>
     </LanguageProvider>
