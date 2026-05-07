@@ -388,6 +388,7 @@ const Login = () => {
                   <span style={s.roleImageShade}></span>
                   <span style={s.roleImageFallback}>{r.fallback}</span>
                   <span style={s.roleGlow}></span>
+                  <span style={s.roleBadge}>{r.fallback}</span>
                   <span
                     style={{
                       ...s.roleReflection,
@@ -591,6 +592,7 @@ const s = {
   roleImageShade: { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(2,6,14,0.02) 0%, rgba(3,8,18,0.22) 52%, rgba(3,8,18,0.75) 100%)', pointerEvents: 'none' },
   roleImageFallback: { position: 'absolute', inset: 0, display: 'none', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #2d436e, #0a1628)', color: '#f2d78b', fontSize: '24px', fontWeight: '800' },
   roleGlow: { position: 'absolute', inset: '-16%', background: 'radial-gradient(circle at 50% 25%, rgba(201,168,76,0.24), rgba(12,24,45,0.12) 45%, transparent 72%)', pointerEvents: 'none' },
+  roleBadge: { position: 'absolute', left: '10px', bottom: '10px', width: '30px', height: '30px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.5)', background: 'rgba(7,16,32,0.78)', color: '#e7cd85', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '800', backdropFilter: 'blur(5px)' },
   roleReflection: { position: 'absolute', inset: 0, pointerEvents: 'none', transition: 'background 0.12s linear' },
   roleLabel: { fontSize: '15px', fontWeight: '800', display: 'block', marginBottom: '5px', letterSpacing: '0.3px' },
   roleSub: { color: '#aebacf', fontSize: '11px', display: 'block', letterSpacing: '0.3px' },
