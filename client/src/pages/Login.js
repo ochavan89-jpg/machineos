@@ -150,7 +150,8 @@ const Login = () => {
       id: 'admin',
       label: 'Admin',
       sub: 'Construction Development',
-      icon: 'building',
+      icon: '🏗️',
+      hint: 'Use registered email for Admin login.',
       image: {
         src: adminRoleImage360,
         srcSet: `${adminRoleImage360} 360w, ${adminRoleImage720} 720w`,
@@ -160,7 +161,8 @@ const Login = () => {
       id: 'client',
       label: 'Client',
       sub: 'Project Stakeholder',
-      icon: 'users',
+      icon: '👤',
+      hint: 'Use registered mobile number for Client login.',
       image: {
         src: clientRoleImage360,
         srcSet: `${clientRoleImage360} 360w, ${clientRoleImage720} 720w`,
@@ -170,7 +172,8 @@ const Login = () => {
       id: 'owner',
       label: 'Owner',
       sub: 'Machine Owner',
-      icon: 'machine',
+      icon: '🚜',
+      hint: 'Use registered mobile number for Owner login.',
       image: {
         src: ownerRoleImage360,
         srcSet: `${ownerRoleImage360} 360w, ${ownerRoleImage720} 720w`,
@@ -180,7 +183,8 @@ const Login = () => {
       id: 'operator',
       label: 'Operator',
       sub: 'Machine Operator',
-      icon: 'operator',
+      icon: '⚙️',
+      hint: 'Use registered mobile number for Operator login.',
       image: {
         src: operatorRoleImage360,
         srcSet: `${operatorRoleImage360} 360w, ${operatorRoleImage720} 720w`,
@@ -341,8 +345,8 @@ const Login = () => {
 
         <div style={s.card}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-            <Link to="/" style={{ color: '#8896a8', fontSize: '12px', textDecoration: 'none', fontWeight: 600 }}>
-              ← {t('marketingBackHome')}
+            <Link to="/" style={{ color: '#94A3B8', fontSize: '13px', textDecoration: 'none', fontWeight: 600 }}>
+              ← Website Home
             </Link>
             <LanguageSelector compact={true} />
           </div>
@@ -389,10 +393,7 @@ const Login = () => {
                   <span style={s.roleImageShade}></span>
                   <span style={s.roleGlow}></span>
                   <span style={s.roleIconBadge}>
-                    {r.icon === 'building' && <span style={s.roleIconGlyph}>▦</span>}
-                    {r.icon === 'users' && <span style={s.roleIconGlyph}>◍</span>}
-                    {r.icon === 'machine' && <span style={s.roleIconGlyph}>◈</span>}
-                    {r.icon === 'operator' && <span style={s.roleIconGlyph}>◎</span>}
+                    <span style={s.roleIconGlyph}>{r.icon}</span>
                   </span>
                   <span
                     style={{
@@ -433,14 +434,14 @@ const Login = () => {
               />
             </div>
             <p style={s.helperText}>
-              {role === 'admin' ? 'Use registered email for Admin login.' : `Use registered mobile for ${ROLES.find((r) => r.id === role)?.label} login.`}
+              {ROLES.find((r) => r.id === role)?.hint}
             </p>
           </div>
 
           <div style={s.fieldGroup}>
             <label style={s.label}>Password</label>
             <div style={s.passwordWrap}>
-              <span style={s.inputIcon}>⌁</span>
+              <span style={s.inputIcon}>🔒</span>
               <input
                 className="lux-input"
                 style={{ ...s.input, paddingRight: '74px' }}
@@ -470,17 +471,17 @@ const Login = () => {
           </button>
 
           <div style={{ textAlign: 'center', marginBottom: '12px' }}>
-            <button style={{ background: 'transparent', border: 'none', color: '#c9a84c', cursor: 'pointer', fontSize: '12px', textDecoration: 'underline' }} onClick={() => setShowSignup(true)}>{t('newClientRegister')}</button>
+            <button style={{ background: 'transparent', border: 'none', color: '#C9A84C', cursor: 'pointer', fontSize: '13px', textDecoration: 'underline' }} onClick={() => setShowSignup(true)}>New Client? Register Here</button>
           </div>
           <div style={s.demoBox}>
-            <p style={s.demoTitle}>Security Notice:</p>
+            <p style={s.demoTitle}>🛡️ Security Notice:</p>
             <p style={{ color: '#8896a8', fontSize: '11px', margin: 0 }}>
               Demo shortcuts are disabled in hardened mode. Use authorized credentials only.
             </p>
           </div>
 
           <div style={s.cardFooter}>
-            <p style={s.footerText}>Secured - Wallet-Only Policy - GST Compliant</p>
+            <p style={s.footerText}>Secured • Wallet-Only Policy • GST Compliant</p>
             <p style={s.footerSub}>+91-9766926636 - machineos@developmentexpress.in</p>
           </div>
         </div>
