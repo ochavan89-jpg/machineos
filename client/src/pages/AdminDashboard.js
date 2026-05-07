@@ -665,24 +665,26 @@ const AdminDashboard = () => {
     }
   };
   const auditCmdInputStyle = {
-    background: 'linear-gradient(180deg, rgba(7,14,26,0.9), rgba(4,9,18,0.92))',
-    color: '#f0e6cd',
-    border: '1px solid rgba(201,168,76,0.34)',
-    borderRadius: '10px',
-    padding: '8px 11px',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), 0 0 0 1px rgba(0,0,0,0.2)',
+    background: 'linear-gradient(180deg, rgba(10,20,35,0.98), rgba(4,10,19,0.98))',
+    color: '#f4e7c0',
+    border: '1px solid rgba(201,168,76,0.48)',
+    borderRadius: '12px',
+    padding: '10px 12px',
+    minHeight: '42px',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.09), inset 0 -8px 18px rgba(0,0,0,0.32), 0 0 0 1px rgba(0,0,0,0.28), 0 8px 20px rgba(0,0,0,0.24)',
+    backdropFilter: 'blur(6px)',
   };
   const auditCmdButtonStyle = {
-    background: 'linear-gradient(115deg, rgba(255,220,140,0.15) 12%, rgba(255,255,255,0.36) 18%, rgba(160,120,48,0.28) 28%, rgba(9,17,30,0.82) 52%, rgba(255,220,140,0.14) 84%)',
+    background: 'linear-gradient(112deg, rgba(255,228,156,0.24) 10%, rgba(255,255,255,0.5) 18%, rgba(194,146,54,0.35) 32%, rgba(11,20,34,0.86) 56%, rgba(255,224,145,0.22) 84%)',
     backgroundSize: '220% 100%',
-    border: '1px solid rgba(234,196,112,0.55)',
-    color: '#f5d88a',
-    borderRadius: '10px',
-    padding: '7px 11px',
+    border: '1px solid rgba(245,216,138,0.78)',
+    color: '#ffebad',
+    borderRadius: '12px',
+    padding: '9px 13px',
     cursor: 'pointer',
     fontSize: '12px',
     fontWeight: '700',
-    boxShadow: '0 8px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2)',
+    boxShadow: '0 10px 22px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.24), inset 0 -10px 16px rgba(0,0,0,0.3), 0 0 16px rgba(201,168,76,0.22)',
     transition: 'all 0.2s ease',
     animation: 'auditShimmerSweep 4.2s linear infinite',
   };
@@ -1836,7 +1838,9 @@ const AdminDashboard = () => {
                 {auditMessage}
               </div>
             )}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', padding: '10px', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '12px', background: 'linear-gradient(170deg, rgba(16,30,48,0.72), rgba(7,14,25,0.82))' }}>
+            <div style={{ position: 'relative', display: 'flex', gap: '10px', marginBottom: '14px', flexWrap: 'wrap', padding: '14px', border: '1px solid rgba(245,216,138,0.34)', borderRadius: '14px', background: 'radial-gradient(circle at 12% -35%, rgba(245,216,138,0.26), transparent 36%), linear-gradient(168deg, rgba(20,36,58,0.86), rgba(7,14,25,0.94))', boxShadow: '0 16px 34px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.08), inset 0 -22px 26px rgba(0,0,0,0.28)' }}>
+              <span aria-hidden style={{ position: 'absolute', top: 0, left: '4%', right: '4%', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(255,230,160,0.9), transparent)', opacity: 0.85 }} />
+              <span aria-hidden style={{ position: 'absolute', bottom: 0, left: '8%', right: '8%', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(201,168,76,0.55), transparent)', opacity: 0.6 }} />
               <input
                 value={auditActionFilter}
                 onChange={(e) => setAuditActionFilter(e.target.value)}
@@ -1852,7 +1856,7 @@ const AdminDashboard = () => {
               <div style={{ position: 'relative', minWidth: '150px' }}>
                 <button
                   type="button"
-                  style={{ ...auditCmdInputStyle, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                  style={{ ...auditCmdInputStyle, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1), 0 0 0 1px rgba(0,0,0,0.25), 0 10px 20px rgba(0,0,0,0.28), 0 0 12px rgba(201,168,76,0.12)' }}
                   onClick={() => setIsAuditRoleOpen((v) => !v)}
                 >
                   <span>{auditRoleFilter || 'All Roles'}</span>
