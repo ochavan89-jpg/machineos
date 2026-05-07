@@ -67,7 +67,6 @@ export const getMachines = async () => {
   } catch (error) {
     console.error(error);
   }
-
   const { data, error } = await supabase.from('machines').select('*').order('machine_id');
   if (error) { console.error(error); return []; }
   return data;
@@ -169,6 +168,24 @@ export const getTransactionsByUser = async (userId) => {
   } catch (error) {
     console.error(error);
     return [];
+  }
+};
+
+export const getMyTransactionsPage = async ({ limit = 50, offset = 0 } = {}) => {
+  try {
+    const params = new URLSearchParams();
+    params.set('limit', String(limit));
+    params.set('offset', String(offset));
+    const result = await secureFetch(`/api/bookings/me/transactions?${params.toString()}`);
+    return {
+      items: result.items || [],
+      hasMore: Boolean(result.hasMore),
+      nextOffset: typeof result.nextOffset === 'number' ? result.nextOffset : null,
+      error: '',
+    };
+  } catch (error) {
+    console.error(error);
+    return { items: [], hasMore: false, nextOffset: null, error: error?.message || 'Failed to fetch transactions' };
   }
 };
 
