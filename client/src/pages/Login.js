@@ -150,41 +150,41 @@ const Login = () => {
       id: 'admin',
       label: 'Admin',
       sub: 'Construction Development',
+      icon: 'building',
       image: {
         src: adminRoleImage360,
         srcSet: `${adminRoleImage360} 360w, ${adminRoleImage720} 720w`,
       },
-      fallback: 'A',
     },
     {
       id: 'client',
       label: 'Client',
       sub: 'Project Stakeholder',
+      icon: 'users',
       image: {
         src: clientRoleImage360,
         srcSet: `${clientRoleImage360} 360w, ${clientRoleImage720} 720w`,
       },
-      fallback: 'C',
     },
     {
       id: 'owner',
       label: 'Owner',
       sub: 'Machine Owner',
+      icon: 'machine',
       image: {
         src: ownerRoleImage360,
         srcSet: `${ownerRoleImage360} 360w, ${ownerRoleImage720} 720w`,
       },
-      fallback: 'O',
     },
     {
       id: 'operator',
       label: 'Operator',
       sub: 'Machine Operator',
+      icon: 'operator',
       image: {
         src: operatorRoleImage360,
         srcSet: `${operatorRoleImage360} 360w, ${operatorRoleImage720} 720w`,
       },
-      fallback: 'P',
     },
   ];
 
@@ -221,6 +221,9 @@ const Login = () => {
             will-change: transform, box-shadow;
             animation: role-float 6s ease-in-out infinite;
             border-radius: 18px;
+          }
+          .premium-role-card:hover {
+            transform: translateY(-4px) scale(1.015) !important;
           }
           .premium-role-grid {
             display: grid;
@@ -286,7 +289,7 @@ const Login = () => {
           }
           .lux-input:focus {
             border-color: rgba(201,168,76,0.72) !important;
-            background: rgba(6,14,27,0.95) !important;
+            background: #0F1E30 !important;
             box-shadow: 0 0 0 2px rgba(201,168,76,0.16), 0 8px 24px rgba(0,0,0,0.35);
           }
           @keyframes role-float {
@@ -381,13 +384,16 @@ const Login = () => {
                     className="role-avatar"
                     onError={(event) => {
                       event.currentTarget.style.display = 'none';
-                      const fallback = event.currentTarget.nextSibling;
-                      if (fallback) fallback.style.display = 'flex';
                     }}
                   />
                   <span style={s.roleImageShade}></span>
-                  <span style={s.roleImageFallback}>{r.fallback}</span>
                   <span style={s.roleGlow}></span>
+                  <span style={s.roleIconBadge}>
+                    {r.icon === 'building' && <span style={s.roleIconGlyph}>▦</span>}
+                    {r.icon === 'users' && <span style={s.roleIconGlyph}>◍</span>}
+                    {r.icon === 'machine' && <span style={s.roleIconGlyph}>◈</span>}
+                    {r.icon === 'operator' && <span style={s.roleIconGlyph}>◎</span>}
+                  </span>
                   <span
                     style={{
                       ...s.roleReflection,
@@ -412,25 +418,29 @@ const Login = () => {
 
           <div style={s.fieldGroup}>
             <label style={s.label}>{loginUsesPhone ? t('mobileNumber') : t('emailAddressLabel')}</label>
-            <input
-              className="lux-input"
-              style={s.input}
-              type={loginUsesPhone ? 'tel' : 'email'}
-              inputMode={loginUsesPhone ? 'numeric' : 'email'}
-              placeholder={loginUsesPhone ? '9876543210' : 'your@email.com'}
-              value={identifier}
-              onChange={e => { setIdentifier(e.target.value); setError(''); }}
-              onKeyDown={e => e.key === 'Enter' && handleLogin()}
-              autoComplete={loginUsesPhone ? 'tel' : 'email'}
-            />
+            <div style={s.inputWrap}>
+              <span style={s.inputIcon}>✉</span>
+              <input
+                className="lux-input"
+                style={s.input}
+                type={loginUsesPhone ? 'tel' : 'email'}
+                inputMode={loginUsesPhone ? 'numeric' : 'email'}
+                placeholder={loginUsesPhone ? '9876543210' : 'your@email.com'}
+                value={identifier}
+                onChange={e => { setIdentifier(e.target.value); setError(''); }}
+                onKeyDown={e => e.key === 'Enter' && handleLogin()}
+                autoComplete={loginUsesPhone ? 'tel' : 'email'}
+              />
+            </div>
             <p style={s.helperText}>
-              {loginUsesPhone ? t('loginPhoneHint') : t('loginEmailHint')}
+              {role === 'admin' ? 'Use registered email for Admin login.' : `Use registered mobile for ${ROLES.find((r) => r.id === role)?.label} login.`}
             </p>
           </div>
 
           <div style={s.fieldGroup}>
             <label style={s.label}>Password</label>
             <div style={s.passwordWrap}>
+              <span style={s.inputIcon}>⌁</span>
               <input
                 className="lux-input"
                 style={{ ...s.input, paddingRight: '74px' }}
@@ -456,7 +466,7 @@ const Login = () => {
           <button style={{ ...s.loginBtn, opacity: loading ? 0.7 : 1 }}
             onClick={handleLogin}
             disabled={loading}>
-            {loading ? t('signingIn') : t('signIn')}
+            {loading ? t('signingIn') : `→  ${t('signIn').toUpperCase()}`}
           </button>
 
           <div style={{ textAlign: 'center', marginBottom: '12px' }}>
@@ -549,7 +559,7 @@ const Login = () => {
 };
 
 const s = {
-  page: { minHeight: '100vh', background: '#050d1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial, sans-serif', position: 'relative', overflow: 'hidden', padding: '20px' },
+  page: { minHeight: '100vh', background: '#0A1628', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Arial, sans-serif', position: 'relative', overflow: 'hidden', padding: '20px' },
   bgGrid: { position: 'fixed', inset: 0, backgroundImage: 'linear-gradient(rgba(201,168,76,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(201,168,76,0.03) 1px, transparent 1px)', backgroundSize: '50px 50px', pointerEvents: 'none' },
   bgGlow1: { position: 'fixed', top: '-20%', right: '-10%', width: '600px', height: '600px', background: 'radial-gradient(circle, rgba(201,168,76,0.08) 0%, transparent 70%)', pointerEvents: 'none' },
   bgGlow2: { position: 'fixed', bottom: '-20%', left: '-10%', width: '500px', height: '500px', background: 'radial-gradient(circle, rgba(10,22,40,0.9) 0%, transparent 70%)', pointerEvents: 'none' },
@@ -560,15 +570,15 @@ const s = {
   companyName: { color: '#c9a84c', fontSize: '18px', fontWeight: '900', margin: '0 0 3px', letterSpacing: '2px' },
   tagline: { color: 'rgba(201,168,76,0.6)', fontSize: '9px', margin: '0 0 2px', letterSpacing: '2px' },
   since: { color: '#8896a8', fontSize: '10px', margin: 0 },
-  card: { background: 'radial-gradient(circle at 16% 4%, rgba(29,54,99,0.7) 0%, rgba(10,22,43,0.94) 36%, rgba(5,12,24,0.98) 100%)', border: '1px solid rgba(201,168,76,0.34)', borderRadius: '28px', padding: '32px 34px', boxShadow: '0 34px 110px rgba(0,0,0,0.68), 0 0 76px rgba(201,168,76,0.08), inset 0 1px 0 rgba(255,255,255,0.12)' },
+  card: { background: '#0D1B2A', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '28px', padding: '32px 34px', boxShadow: '0 34px 110px rgba(0,0,0,0.68), 0 0 76px rgba(201,168,76,0.08), inset 0 1px 0 rgba(255,255,255,0.1)' },
   cardHeader: { textAlign: 'center', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid rgba(201,168,76,0.1)' },
   cardTitle: { color: '#c9a84c', fontSize: '20px', fontWeight: '700', margin: '0 0 6px' },
   cardSub: { color: '#8896a8', fontSize: '12px', margin: 0 },
-  label: { color: '#9ba8bb', fontSize: '11px', marginBottom: '8px', letterSpacing: '1px', display: 'block' },
-  roleSectionLabel: { color: '#d7bc73', fontSize: '12px', marginBottom: '12px', letterSpacing: '2.2px', fontWeight: 700, textAlign: 'center', textTransform: 'uppercase' },
+  label: { color: '#94A3B8', fontSize: '11px', marginBottom: '8px', letterSpacing: '1px', display: 'block' },
+  roleSectionLabel: { color: '#C9A84C', fontSize: '12px', marginBottom: '12px', letterSpacing: '2.2px', fontWeight: 700, textAlign: 'center', textTransform: 'uppercase' },
   roleGrid: { marginBottom: '20px' },
   roleBtn: {
-    background: 'linear-gradient(165deg, rgba(19,35,66,0.68) 0%, rgba(8,16,31,0.93) 100%)',
+    background: '#0D1B2A',
     border: '1px solid rgba(201,168,76,0.27)',
     borderRadius: '18px',
     padding: 0,
@@ -589,31 +599,34 @@ const s = {
   roleImageWrap: { position: 'relative', width: '100%', height: '176px', margin: 0, borderRadius: '18px 18px 0 0', overflow: 'hidden', borderBottom: '1px solid rgba(201,168,76,0.22)', boxShadow: 'inset 0 -38px 80px rgba(2,6,14,0.52)', zIndex: 1 },
   roleImage: { width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'saturate(1.12) contrast(1.08) brightness(0.93)' },
   roleImageShade: { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(2,6,14,0.02) 0%, rgba(3,8,18,0.22) 52%, rgba(3,8,18,0.75) 100%)', pointerEvents: 'none' },
-  roleImageFallback: { position: 'absolute', inset: 0, display: 'none', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #2d436e, #0a1628)', color: '#f2d78b', fontSize: '24px', fontWeight: '800' },
+  roleIconBadge: { position: 'absolute', left: '10px', bottom: '10px', width: '30px', height: '30px', borderRadius: '8px', border: '1px solid rgba(201,168,76,0.45)', background: 'rgba(10,22,40,0.85)', color: '#C9A84C', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  roleIconGlyph: { fontSize: '14px', lineHeight: 1, fontWeight: 700 },
   roleGlow: { position: 'absolute', inset: '-16%', background: 'radial-gradient(circle at 50% 25%, rgba(201,168,76,0.24), rgba(12,24,45,0.12) 45%, transparent 72%)', pointerEvents: 'none' },
   roleReflection: { position: 'absolute', inset: 0, pointerEvents: 'none', transition: 'background 0.12s linear' },
   roleLabel: { fontSize: '15px', fontWeight: '800', display: 'block', marginBottom: '5px', letterSpacing: '0.3px' },
-  roleSub: { color: '#aebacf', fontSize: '11px', display: 'block', letterSpacing: '0.3px' },
-  selectedBadge: { display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, rgba(15,30,58,0.62), rgba(7,16,30,0.88))', border: '1px solid rgba(201,168,76,0.18)', borderRadius: '10px', padding: '10px 12px', marginBottom: '18px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)' },
-  selectedDot: { width: '6px', height: '6px', background: '#4CAF50', borderRadius: '50%', flexShrink: 0 },
-  selectedText: { color: '#8896a8', fontSize: '12px' },
+  roleSub: { color: '#94A3B8', fontSize: '11px', display: 'block', letterSpacing: '0.3px' },
+  selectedBadge: { display: 'flex', alignItems: 'center', gap: '8px', background: '#0F1E30', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '10px', padding: '10px 12px', marginBottom: '18px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' },
+  selectedDot: { width: '8px', height: '8px', background: '#22C55E', borderRadius: '50%', flexShrink: 0 },
+  selectedText: { color: '#FFFFFF', fontSize: '12px' },
   fieldGroup: { marginBottom: '14px' },
-  input: { width: '100%', padding: '12px 14px', background: 'linear-gradient(180deg, rgba(7,16,31,0.95), rgba(4,10,20,0.95))', border: '1px solid rgba(201,168,76,0.28)', borderRadius: '10px', color: '#fff', fontSize: '13px', boxSizing: 'border-box', outline: 'none', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' },
+  inputWrap: { position: 'relative' },
+  inputIcon: { position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', fontSize: '14px', pointerEvents: 'none', zIndex: 2 },
+  input: { width: '100%', padding: '12px 14px 12px 34px', background: '#0F1E30', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '10px', color: '#FFFFFF', fontSize: '13px', boxSizing: 'border-box', outline: 'none', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' },
   modalInput: { width: '100%', padding: '10px 12px', background: 'rgba(5,13,26,0.8)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box', outline: 'none' },
-  helperText: { color: '#8896a8', fontSize: '11px', margin: '6px 0 0' },
+  helperText: { color: '#94A3B8', fontSize: '11px', margin: '6px 0 0' },
   fieldHint: { color: '#8896a8', fontSize: '11px', margin: '6px 0 0' },
   signupIntro: { color: '#8896a8', fontSize: '12px', textAlign: 'center', margin: '0 0 16px' },
   passwordWrap: { position: 'relative' },
   passwordToggle: { position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: '#c9a84c', cursor: 'pointer', fontSize: '12px', fontWeight: '700' },
   errorBox: { background: 'rgba(233,69,96,0.1)', border: '1px solid rgba(233,69,96,0.4)', borderRadius: '8px', padding: '10px 14px', marginBottom: '14px', color: '#e94560', fontSize: '12px' },
-  loginBtn: { width: '100%', padding: '14px', background: 'linear-gradient(135deg, #a07830 0%, #e2c97e 50%, #a07830 100%)', color: '#0a1628', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '800', cursor: 'pointer', letterSpacing: '1px', boxShadow: '0 8px 25px rgba(201,168,76,0.3)', marginBottom: '18px' },
-  demoBox: { background: 'rgba(0,0,0,0.2)', borderRadius: '10px', padding: '14px', marginBottom: '18px' },
-  demoTitle: { color: '#8896a8', fontSize: '10px', letterSpacing: '1px', margin: '0 0 10px' },
+  loginBtn: { width: '100%', padding: '14px', background: '#C9A84C', color: '#0A1628', border: 'none', borderRadius: '12px', fontSize: '15px', fontWeight: '800', cursor: 'pointer', letterSpacing: '1px', boxShadow: '0 8px 25px rgba(201,168,76,0.35)', marginBottom: '18px' },
+  demoBox: { background: '#0F1E30', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '10px', padding: '14px', marginBottom: '18px' },
+  demoTitle: { color: '#FFFFFF', fontSize: '10px', letterSpacing: '1px', margin: '0 0 10px' },
   demoGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '6px' },
   demoBtn: { background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: '8px', padding: '8px', cursor: 'pointer', textAlign: 'left' },
   cardFooter: { textAlign: 'center', paddingTop: '16px', borderTop: '1px solid rgba(201,168,76,0.1)' },
-  footerText: { color: '#4CAF50', fontSize: '11px', margin: '0 0 4px' },
-  footerSub: { color: '#8896a8', fontSize: '10px', margin: 0 },
+  footerText: { color: '#22C55E', fontSize: '11px', margin: '0 0 4px' },
+  footerSub: { color: '#FFFFFF', fontSize: '10px', margin: 0 },
   bottomText: { color: 'rgba(201,168,76,0.3)', fontSize: '10px', textAlign: 'center', marginTop: '16px', letterSpacing: '0.5px' },
 };
 
