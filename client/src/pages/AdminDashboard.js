@@ -656,6 +656,28 @@ const AdminDashboard = () => {
       setTimeout(() => setAuditMessage(''), 2200);
     }
   };
+  const auditCmdInputStyle = {
+    background: 'linear-gradient(180deg, rgba(7,14,26,0.9), rgba(4,9,18,0.92))',
+    color: '#f0e6cd',
+    border: '1px solid rgba(201,168,76,0.34)',
+    borderRadius: '10px',
+    padding: '8px 11px',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06), 0 0 0 1px rgba(0,0,0,0.2)',
+  };
+  const auditCmdButtonStyle = {
+    background: 'linear-gradient(115deg, rgba(255,220,140,0.15) 12%, rgba(255,255,255,0.36) 18%, rgba(160,120,48,0.28) 28%, rgba(9,17,30,0.82) 52%, rgba(255,220,140,0.14) 84%)',
+    backgroundSize: '220% 100%',
+    border: '1px solid rgba(234,196,112,0.55)',
+    color: '#f5d88a',
+    borderRadius: '10px',
+    padding: '7px 11px',
+    cursor: 'pointer',
+    fontSize: '12px',
+    fontWeight: '700',
+    boxShadow: '0 8px 16px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.2)',
+    transition: 'all 0.2s ease',
+    animation: 'auditShimmerSweep 4.2s linear infinite',
+  };
   const expandedAuditCount = Object.values(expandedAuditRows).filter(Boolean).length;
   const auditVirtual = useMemo(() => {
     const rowHeight = 44;
@@ -894,6 +916,31 @@ const AdminDashboard = () => {
   const handlePremiumButtonUp = (event) => {
     handlePremiumButtonHover(event);
   };
+  const handleAuditCmdHover = (event) => {
+    event.currentTarget.style.transform = 'translateY(-1px)';
+    event.currentTarget.style.boxShadow = '0 12px 22px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.28), 0 0 18px rgba(201,168,76,0.22)';
+    event.currentTarget.style.filter = 'brightness(1.08)';
+  };
+  const handleAuditCmdLeave = (event) => {
+    event.currentTarget.style.transform = 'translateY(0)';
+    event.currentTarget.style.boxShadow = '';
+    event.currentTarget.style.filter = 'brightness(1)';
+  };
+  const handleAuditCmdDown = (event) => {
+    event.currentTarget.style.transform = 'translateY(1px)';
+    event.currentTarget.style.boxShadow = '0 5px 10px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.12)';
+  };
+  const handleAuditCmdUp = (event) => {
+    handleAuditCmdHover(event);
+  };
+  const handleNavHover = (event) => {
+    event.currentTarget.style.transform = 'translateX(3px) translateY(-1px)';
+    event.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.28), 0 0 14px rgba(201,168,76,0.16)';
+  };
+  const handleNavLeave = (event) => {
+    event.currentTarget.style.transform = 'translateX(0) translateY(0)';
+    event.currentTarget.style.boxShadow = '';
+  };
   const openDatePicker = (inputRef) => {
     const input = inputRef?.current;
     if (!input) return;
@@ -907,6 +954,21 @@ const AdminDashboard = () => {
 
   return (
     <div style={s.container}>
+      <style>{`
+        @keyframes auditPulseRail {
+          0% { opacity: 0.5; filter: blur(0px); }
+          50% { opacity: 1; filter: blur(0.6px); }
+          100% { opacity: 0.5; filter: blur(0px); }
+        }
+        @keyframes auditNoiseMove {
+          0% { transform: translateX(0) translateY(0); }
+          100% { transform: translateX(-24px) translateY(14px); }
+        }
+        @keyframes auditShimmerSweep {
+          0% { background-position: -160% 0; }
+          100% { background-position: 190% 0; }
+        }
+      `}</style>
       {isSmall && (
         <MobileNav
           navItems={navItems}
@@ -933,7 +995,13 @@ const AdminDashboard = () => {
           </div>
           <div style={s.divider} />
           {navItems.map(item => (
-            <button key={item.id} style={activeTab === item.id ? s.navActive : s.nav} onClick={() => setActiveTab(item.id)}>
+            <button
+              key={item.id}
+              style={activeTab === item.id ? s.navActive : s.nav}
+              onClick={() => setActiveTab(item.id)}
+              onMouseEnter={handleNavHover}
+              onMouseLeave={handleNavLeave}
+            >
               <span>{item.icon}</span>
               <span>{item.label}</span>
             </button>
@@ -1765,15 +1833,15 @@ const AdminDashboard = () => {
                 value={auditActionFilter}
                 onChange={(e) => setAuditActionFilter(e.target.value)}
                 placeholder="Filter action (e.g. dlq_retry)"
-                style={{ background: 'rgba(3,8,16,0.6)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '8px', padding: '7px 10px' }}
+                style={auditCmdInputStyle}
               />
               <input
                 value={auditActorFilter}
                 onChange={(e) => setAuditActorFilter(e.target.value)}
                 placeholder="Filter actorId"
-                style={{ background: 'rgba(3,8,16,0.6)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '8px', padding: '7px 10px' }}
+                style={auditCmdInputStyle}
               />
-              <select value={auditRoleFilter} onChange={(e) => setAuditRoleFilter(e.target.value)} style={{ background: 'rgba(3,8,16,0.6)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '8px', padding: '7px 10px' }}>
+              <select value={auditRoleFilter} onChange={(e) => setAuditRoleFilter(e.target.value)} style={auditCmdInputStyle}>
                 <option value="">All Roles</option>
                 <option value="admin">admin</option>
                 <option value="owner">owner</option>
@@ -1784,31 +1852,31 @@ const AdminDashboard = () => {
                 value={auditEntityFilter}
                 onChange={(e) => setAuditEntityFilter(e.target.value)}
                 placeholder="Entity type (e.g. dead_letter_queue)"
-                style={{ background: 'rgba(3,8,16,0.6)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '8px', padding: '7px 10px' }}
+                style={auditCmdInputStyle}
               />
               <input
                 value={auditMetaFilter}
                 onChange={(e) => setAuditMetaFilter(e.target.value)}
                 placeholder="Search metadata JSON"
-                style={{ background: 'rgba(3,8,16,0.6)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '8px', padding: '7px 10px' }}
+                style={auditCmdInputStyle}
               />
               <input
                 type="datetime-local"
                 value={auditFrom}
                 onChange={(e) => setAuditFrom(e.target.value)}
-                style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}
+                style={auditCmdInputStyle}
               />
               <input
                 type="datetime-local"
                 value={auditTo}
                 onChange={(e) => setAuditTo(e.target.value)}
-                style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}
+                style={auditCmdInputStyle}
               />
-              <button style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={() => setAuditPreset('today')}>{t('todayText')}</button>
-              <button style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={() => setAuditPreset('24h')}>24h</button>
-              <button style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={() => setAuditPreset('7d')}>7d</button>
-              <button style={{ background: 'rgba(201,168,76,0.15)', border: '1px solid rgba(201,168,76,0.35)', color: '#c9a84c', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={() => setAuditPreset('')}>{t('resetText')}</button>
-              <button style={{ background: 'rgba(76,175,80,0.15)', border: '1px solid #4CAF50', color: '#4CAF50', borderRadius: '6px', padding: '6px 10px', cursor: 'pointer' }} onClick={exportAuditCsv}>{t('exportCsv')}</button>
+              <button style={auditCmdButtonStyle} onClick={() => setAuditPreset('today')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>{t('todayText')}</button>
+              <button style={auditCmdButtonStyle} onClick={() => setAuditPreset('24h')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>24h</button>
+              <button style={auditCmdButtonStyle} onClick={() => setAuditPreset('7d')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>7d</button>
+              <button style={auditCmdButtonStyle} onClick={() => setAuditPreset('')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>{t('resetText')}</button>
+              <button style={{ ...auditCmdButtonStyle, color: '#9fe3be', border: '1px solid rgba(76,175,80,0.55)' }} onClick={exportAuditCsv} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>{t('exportCsv')}</button>
             </div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={{ color: '#8896a8', fontSize: '11px' }}>Timezone: {Intl.DateTimeFormat().resolvedOptions().timeZone} (local)</span>
@@ -1859,6 +1927,8 @@ const AdminDashboard = () => {
                     <div
                       key={row.id}
                       style={{
+                        position: 'relative',
+                        overflow: 'hidden',
                         border: `1px solid ${severity.glow}`,
                         borderLeft: `4px solid ${severity.rail}`,
                         borderRadius: '14px',
@@ -1868,6 +1938,29 @@ const AdminDashboard = () => {
                         boxShadow: `0 10px 24px rgba(0,0,0,0.28), 0 0 22px ${severity.glow}`,
                       }}
                     >
+                      <span
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          top: 0,
+                          bottom: 0,
+                          width: '3px',
+                          background: `linear-gradient(180deg, ${severity.rail}, transparent 60%, ${severity.rail})`,
+                          boxShadow: `0 0 14px ${severity.glow}`,
+                          animation: 'auditPulseRail 1.8s ease-in-out infinite',
+                        }}
+                      />
+                      <span
+                        aria-hidden
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          backgroundImage: 'repeating-linear-gradient(120deg, rgba(255,255,255,0.02) 0px, rgba(255,255,255,0.02) 1px, transparent 1px, transparent 7px)',
+                          opacity: 0.35,
+                          pointerEvents: 'none',
+                          animation: 'auditNoiseMove 6s linear infinite',
+                        }}
+                      />
                       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
                           <span style={{ color: '#9aa8bb', fontSize: '11px', background: 'rgba(9,17,31,0.65)', border: '1px solid rgba(148,163,184,0.22)', borderRadius: '999px', padding: '2px 8px' }}>
@@ -2238,8 +2331,8 @@ const s = {
   logoTitle: { color: '#c9a84c', fontWeight: '700', fontSize: '14px', margin: 0 },
   logoSub: { color: '#8896a8', fontSize: '10px', margin: 0 },
   divider: { height: '1px', background: 'rgba(201,168,76,0.15)', margin: '10px 0' },
-  nav: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', border: 'none', background: 'transparent', color: '#8896a8', cursor: 'pointer', fontSize: '13px', width: '100%', textAlign: 'left' },
-  navActive: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(201,168,76,0.3)', background: 'rgba(201,168,76,0.1)', color: '#c9a84c', cursor: 'pointer', fontSize: '13px', width: '100%', textAlign: 'left', fontWeight: '700' },
+  nav: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.1)', background: 'linear-gradient(145deg, rgba(15,32,64,0.25), rgba(10,22,40,0.55))', color: '#9aa8bb', cursor: 'pointer', fontSize: '13px', width: '100%', textAlign: 'left', transition: 'all 0.2s ease' },
+  navActive: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.45)', background: 'linear-gradient(145deg, rgba(201,168,76,0.22), rgba(39,27,6,0.35) 45%, rgba(9,18,32,0.92))', color: '#f2d78b', cursor: 'pointer', fontSize: '13px', width: '100%', textAlign: 'left', fontWeight: '700', boxShadow: '0 8px 18px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.18), 0 0 16px rgba(201,168,76,0.22)' },
   logoutBtn: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(233,69,96,0.3)', background: 'rgba(233,69,96,0.08)', color: '#e94560', cursor: 'pointer', fontSize: '13px', width: '100%', marginTop: 'auto' },
   sidebarFooter: { color: 'rgba(201,168,76,0.4)', fontSize: '9px', textAlign: 'center', marginTop: '10px', letterSpacing: '1px' },
   main: { flex: 1, overflowY: 'auto' },
