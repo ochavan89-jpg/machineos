@@ -207,7 +207,7 @@ const OwnerDashboard = () => {
     localStorage.removeItem('machineos_user');
     localStorage.removeItem('machineos_token');
     localStorage.removeItem('machineos_refresh_token');
-    navigate('/login', { replace: true });
+    window.location.replace('/login');
   };
 
   return (

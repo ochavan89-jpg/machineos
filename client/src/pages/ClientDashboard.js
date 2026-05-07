@@ -1,6 +1,5 @@
 import { initiatePayment } from '../razorpayService';
 import React, { useState, useEffect,  } from 'react';
-import { useNavigate } from 'react-router-dom';
 import useSessionTimeout from '../hooks/useSessionTimeout';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageSelector from '../components/LanguageSelector';
@@ -137,7 +136,6 @@ const ClientMonthAccordion = ({ month, days, isSmall, s, handleCancelRequest, t 
 };
 
 const ClientDashboard = () => {
-  const navigate = useNavigate();
   useSessionTimeout();
   const { t } = useLanguage(); // eslint-disable-line
   const { isMobile, isTablet } = useWindowSize();
@@ -173,7 +171,7 @@ const ClientDashboard = () => {
     localStorage.removeItem('machineos_user');
     localStorage.removeItem('machineos_token');
     localStorage.removeItem('machineos_refresh_token');
-    navigate('/login', { replace: true });
+    window.location.replace('/login');
   };
 
   useEffect(() => {

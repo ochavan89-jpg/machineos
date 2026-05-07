@@ -1,6 +1,5 @@
 ﻿/* eslint-disable unicode-bom */
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
 import useSessionTimeout from '../hooks/useSessionTimeout';
 import { useLanguage } from '../context/LanguageContext';
 import LanguageSelector from '../components/LanguageSelector';
@@ -150,7 +149,6 @@ const MonthAccordion = ({ month, days, userData, s, isSmall }) => {
 
 
 const AdminDashboard = () => {
-  const navigate = useNavigate();
   useSessionTimeout();
   const { t } = useLanguage(); // eslint-disable-line
   const navItems = useMemo(() => NAV.map((item) => ({ ...item, label: item.i18nKey ? t(item.i18nKey) : item.label })), [t]);
@@ -611,7 +609,7 @@ const AdminDashboard = () => {
     localStorage.removeItem('machineos_user');
     localStorage.removeItem('machineos_token');
     localStorage.removeItem('machineos_refresh_token');
-    navigate('/login', { replace: true });
+    window.location.replace('/login');
   };
   const clearAuditField = (field) => {
     if (field === 'action') setAuditActionFilter('');
