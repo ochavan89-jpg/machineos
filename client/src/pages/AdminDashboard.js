@@ -196,6 +196,7 @@ const AdminDashboard = () => {
   const [auditActionFilter, setAuditActionFilter] = useState('');
   const [auditActorFilter, setAuditActorFilter] = useState('');
   const [auditRoleFilter, setAuditRoleFilter] = useState('');
+  const [isAuditRoleOpen, setIsAuditRoleOpen] = useState(false);
   const [auditEntityFilter, setAuditEntityFilter] = useState('');
   const [auditFrom, setAuditFrom] = useState('');
   const [auditTo, setAuditTo] = useState('');
@@ -203,6 +204,7 @@ const AdminDashboard = () => {
   const [auditCursor, setAuditCursor] = useState(null);
   const [auditHasMore, setAuditHasMore] = useState(false);
   const [auditLoadingMore, setAuditLoadingMore] = useState(false);
+  const [auditPresetActive, setAuditPresetActive] = useState('');
   const [selectedDlqItem, setSelectedDlqItem] = useState(null);
   const [dlqRetryReason, setDlqRetryReason] = useState('');
   const [expandedAuditRows, setExpandedAuditRows] = useState({});
@@ -524,6 +526,7 @@ const AdminDashboard = () => {
   }, [activeTab, auditActionFilter, auditActorFilter, auditRoleFilter, auditEntityFilter, auditMetaFilter, auditFrom, auditTo, loading]);
 
   const setAuditPreset = (preset) => {
+    setAuditPresetActive(preset || '');
     const now = new Date();
     if (preset === 'today') {
       const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -564,7 +567,10 @@ const AdminDashboard = () => {
   const clearAuditField = (field) => {
     if (field === 'action') setAuditActionFilter('');
     if (field === 'actor') setAuditActorFilter('');
-    if (field === 'role') setAuditRoleFilter('');
+    if (field === 'role') {
+      setAuditRoleFilter('');
+      setIsAuditRoleOpen(false);
+    }
     if (field === 'entity') setAuditEntityFilter('');
     if (field === 'meta') setAuditMetaFilter('');
     if (field === 'from') setAuditFrom('');
@@ -578,6 +584,8 @@ const AdminDashboard = () => {
     setAuditMetaFilter('');
     setAuditFrom('');
     setAuditTo('');
+    setIsAuditRoleOpen(false);
+    setAuditPresetActive('');
   };
 
   // Derived data from Supabase
@@ -1841,13 +1849,42 @@ const AdminDashboard = () => {
                 placeholder="Filter actorId"
                 style={auditCmdInputStyle}
               />
-              <select value={auditRoleFilter} onChange={(e) => setAuditRoleFilter(e.target.value)} style={auditCmdInputStyle}>
-                <option value="">All Roles</option>
-                <option value="admin">admin</option>
-                <option value="owner">owner</option>
-                <option value="client">client</option>
-                <option value="operator">operator</option>
-              </select>
+              <div style={{ position: 'relative', minWidth: '150px' }}>
+                <button
+                  type="button"
+                  style={{ ...auditCmdInputStyle, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                  onClick={() => setIsAuditRoleOpen((v) => !v)}
+                >
+                  <span>{auditRoleFilter || 'All Roles'}</span>
+                  <span style={{ color: '#f5d88a', fontSize: '11px' }}>{isAuditRoleOpen ? '▲' : '▼'}</span>
+                </button>
+                {isAuditRoleOpen && (
+                  <div style={{ position: 'absolute', top: '110%', left: 0, right: 0, zIndex: 40, borderRadius: '10px', border: '1px solid rgba(201,168,76,0.4)', background: 'linear-gradient(165deg, rgba(12,24,40,0.98), rgba(6,12,22,0.99))', boxShadow: '0 14px 30px rgba(0,0,0,0.42)' }}>
+                    {['', 'admin', 'owner', 'client', 'operator'].map((role) => (
+                      <button
+                        key={role || 'all'}
+                        type="button"
+                        onClick={() => {
+                          setAuditRoleFilter(role);
+                          setIsAuditRoleOpen(false);
+                        }}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          border: 'none',
+                          background: auditRoleFilter === role ? 'rgba(201,168,76,0.2)' : 'transparent',
+                          color: auditRoleFilter === role ? '#f7df9b' : '#d2d8e2',
+                          padding: '8px 10px',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                        }}
+                      >
+                        {role || 'All Roles'}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <input
                 value={auditEntityFilter}
                 onChange={(e) => setAuditEntityFilter(e.target.value)}
@@ -1872,10 +1909,10 @@ const AdminDashboard = () => {
                 onChange={(e) => setAuditTo(e.target.value)}
                 style={auditCmdInputStyle}
               />
-              <button style={auditCmdButtonStyle} onClick={() => setAuditPreset('today')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>{t('todayText')}</button>
-              <button style={auditCmdButtonStyle} onClick={() => setAuditPreset('24h')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>24h</button>
-              <button style={auditCmdButtonStyle} onClick={() => setAuditPreset('7d')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>7d</button>
-              <button style={auditCmdButtonStyle} onClick={() => setAuditPreset('')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>{t('resetText')}</button>
+              <button style={{ ...auditCmdButtonStyle, ...(auditPresetActive === 'today' ? { border: '1px solid rgba(245,216,138,0.9)', boxShadow: '0 10px 20px rgba(0,0,0,0.35), 0 0 14px rgba(201,168,76,0.4)' } : {}) }} onClick={() => setAuditPreset('today')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>{t('todayText')}</button>
+              <button style={{ ...auditCmdButtonStyle, ...(auditPresetActive === '24h' ? { border: '1px solid rgba(245,216,138,0.9)', boxShadow: '0 10px 20px rgba(0,0,0,0.35), 0 0 14px rgba(201,168,76,0.4)' } : {}) }} onClick={() => setAuditPreset('24h')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>24h</button>
+              <button style={{ ...auditCmdButtonStyle, ...(auditPresetActive === '7d' ? { border: '1px solid rgba(245,216,138,0.9)', boxShadow: '0 10px 20px rgba(0,0,0,0.35), 0 0 14px rgba(201,168,76,0.4)' } : {}) }} onClick={() => setAuditPreset('7d')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>7d</button>
+              <button style={{ ...auditCmdButtonStyle, ...(auditPresetActive === '' ? { border: '1px solid rgba(245,216,138,0.9)', boxShadow: '0 10px 20px rgba(0,0,0,0.35), 0 0 14px rgba(201,168,76,0.4)' } : {}) }} onClick={() => setAuditPreset('')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>{t('resetText')}</button>
               <button style={{ ...auditCmdButtonStyle, color: '#9fe3be', border: '1px solid rgba(76,175,80,0.55)' }} onClick={exportAuditCsv} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>{t('exportCsv')}</button>
             </div>
             <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
