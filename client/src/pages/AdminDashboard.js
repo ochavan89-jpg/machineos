@@ -1,5 +1,5 @@
 ﻿/* eslint-disable unicode-bom */
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useSessionTimeout from '../hooks/useSessionTimeout';
 import { useLanguage } from '../context/LanguageContext';
@@ -9,6 +9,57 @@ import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { getMachinesPage, getAllBookingsPage, getAllUsersPage, getAllTransactionsPage, getAllIssuesPage, getPendingUsers, approveUser, rejectUser, getDlqItems, retryDlqItem, getDlqStats, getAuditLogs, getRateLimitTelemetry, getApiHealthTelemetry, acknowledgeSecuritySignal } from '../supabaseService';
 import { appendUniqueById } from '../utils/pagination';
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+
+const inferTxnStatus = (tx = {}) => {
+  const text = String(tx.description || '').toLowerCase();
+  if (text.includes('[failed]')) return 'failed';
+  if (text.includes('[reversed]') || text.includes('refund')) return 'reversed';
+  return 'captured';
+};
+
+const inferTxnChannel = (tx = {}) => {
+  const text = String(tx.description || '').toLowerCase();
+  if (text.includes('[wallet_recharge]')) return 'wallet_recharge';
+  if (text.includes('[booking_advance]')) return 'booking_advance';
+  if (text.includes('refund')) return 'refund';
+  return 'general';
+};
+
+const toDateInputValue = (date) => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+const getCurrentMonthRange = () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  return { from: toDateInputValue(start), to: toDateInputValue(now) };
+};
+
+const getLastDaysRange = (days) => {
+  const now = new Date();
+  const start = new Date(now);
+  start.setDate(now.getDate() - Math.max(0, days - 1));
+  return { from: toDateInputValue(start), to: toDateInputValue(now) };
+};
+
+const CHANNEL_OPTIONS = [
+  { value: 'all', label: 'All Channels' },
+  { value: 'wallet_recharge', label: 'wallet_recharge' },
+  { value: 'booking_advance', label: 'booking_advance' },
+  { value: 'refund', label: 'refund' },
+  { value: 'general', label: 'general' },
+];
+
+const STATUS_OPTIONS = [
+  { value: 'all', label: 'All Status' },
+  { value: 'captured', label: 'captured' },
+  { value: 'failed', label: 'failed' },
+  { value: 'reversed', label: 'reversed' },
+];
 
 const NAV = [
   { id: 'overview', icon: String.fromCodePoint(0x1F4CA), label: 'Overview', i18nKey: 'overview' },
@@ -120,6 +171,14 @@ const AdminDashboard = () => {
   const [transactionsOffset, setTransactionsOffset] = useState(0);
   const [transactionsHasMore, setTransactionsHasMore] = useState(false);
   const [transactionsLoadingMore, setTransactionsLoadingMore] = useState(false);
+  const [reconFrom, setReconFrom] = useState(() => getCurrentMonthRange().from);
+  const [reconTo, setReconTo] = useState(() => getCurrentMonthRange().to);
+  const [txnChannelFilter, setTxnChannelFilter] = useState('all');
+  const [txnStatusFilter, setTxnStatusFilter] = useState('all');
+  const [isChannelOpen, setIsChannelOpen] = useState(false);
+  const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const reconFromInputRef = useRef(null);
+  const reconToInputRef = useRef(null);
   const [issuesOffset, setIssuesOffset] = useState(0);
   const [issuesHasMore, setIssuesHasMore] = useState(false);
   const [issuesLoadingMore, setIssuesLoadingMore] = useState(false);
@@ -223,14 +282,7 @@ const AdminDashboard = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [
-          machinesPage,
-          bookingsPage,
-          usersPage,
-          transactionsPage,
-          issuesPage,
-          pending,
-        ] = await Promise.all([
+        const results = await Promise.allSettled([
           getMachinesPage({ limit: 250, offset: 0 }),
           getAllBookingsPage({ limit: 250, offset: 0 }),
           getAllUsersPage({ limit: 250, offset: 0 }),
@@ -238,22 +290,46 @@ const AdminDashboard = () => {
           getAllIssuesPage({ limit: 250, offset: 0 }),
           getPendingUsers(),
         ]);
-        setMachineData(machinesPage.items || []);
-        setMachinesHasMore(Boolean(machinesPage.hasMore));
-        setMachinesOffset(machinesPage.nextOffset || 0);
-        setBookingData(bookingsPage.items || []);
-        setBookingsHasMore(Boolean(bookingsPage.hasMore));
-        setBookingsOffset(bookingsPage.nextOffset || 0);
-        setUserData(usersPage.items || []);
-        setUsersHasMore(Boolean(usersPage.hasMore));
-        setUsersOffset(usersPage.nextOffset || 0);
-        setTransactionData(transactionsPage.items || []);
-        setTransactionsHasMore(Boolean(transactionsPage.hasMore));
-        setTransactionsOffset(transactionsPage.nextOffset || 0);
-        setIssueData(issuesPage.items || []);
-        setIssuesHasMore(Boolean(issuesPage.hasMore));
-        setIssuesOffset(issuesPage.nextOffset || 0);
-        setPendingUsers(Array.isArray(pending) ? pending : []);
+
+        const readPage = (index) => {
+          const result = results[index];
+          if (result?.status !== 'fulfilled') return null;
+          return result.value || null;
+        };
+        const readArray = (index) => {
+          const result = results[index];
+          if (result?.status !== 'fulfilled') return [];
+          return Array.isArray(result.value) ? result.value : [];
+        };
+
+        const machinesPage = readPage(0);
+        const bookingsPage = readPage(1);
+        const usersPage = readPage(2);
+        const transactionsPage = readPage(3);
+        const issuesPage = readPage(4);
+        const pending = readArray(5);
+
+        setMachineData(machinesPage?.items || []);
+        setMachinesHasMore(Boolean(machinesPage?.hasMore));
+        setMachinesOffset(machinesPage?.nextOffset || 0);
+        setBookingData(bookingsPage?.items || []);
+        setBookingsHasMore(Boolean(bookingsPage?.hasMore));
+        setBookingsOffset(bookingsPage?.nextOffset || 0);
+        setUserData(usersPage?.items || []);
+        setUsersHasMore(Boolean(usersPage?.hasMore));
+        setUsersOffset(usersPage?.nextOffset || 0);
+        setTransactionData(transactionsPage?.items || []);
+        setTransactionsHasMore(Boolean(transactionsPage?.hasMore));
+        setTransactionsOffset(transactionsPage?.nextOffset || 0);
+        setIssueData(issuesPage?.items || []);
+        setIssuesHasMore(Boolean(issuesPage?.hasMore));
+        setIssuesOffset(issuesPage?.nextOffset || 0);
+        setPendingUsers(pending);
+
+        const failedCount = results.filter((entry) => entry.status === 'rejected').length;
+        if (failedCount > 0) {
+          setSecurityPanelMessage(`Some admin panels failed to load (${failedCount}). Other report data is shown.`);
+        }
 
         void (async () => {
           try {
@@ -513,6 +589,73 @@ const AdminDashboard = () => {
   const commission = Math.round(totalRevenue * 0.15);
   const lowFuelMachines = machineData.filter(m => (m.fuel_level || 0) < 30);
   const visibleAuditLogs = auditLogs;
+  const auditRoleCounts = useMemo(() => {
+    const counts = { admin: 0, owner: 0, client: 0, operator: 0, unknown: 0 };
+    (visibleAuditLogs || []).forEach((row) => {
+      const role = (row?.actor_role || '').toString().toLowerCase();
+      if (Object.prototype.hasOwnProperty.call(counts, role)) counts[role] += 1;
+      else counts.unknown += 1;
+    });
+    return counts;
+  }, [visibleAuditLogs]);
+  const securityAuditCount = useMemo(
+    () => (visibleAuditLogs || []).filter((row) => String(row?.action || '').startsWith('security.')).length,
+    [visibleAuditLogs],
+  );
+  const uniqueAuditActors = useMemo(
+    () => new Set((visibleAuditLogs || []).map((row) => row?.actor_id).filter(Boolean)).size,
+    [visibleAuditLogs],
+  );
+  const getRoleBadgeStyle = (role) => {
+    const normalized = String(role || '').toLowerCase();
+    if (normalized === 'admin') return { color: '#f7df9b', border: '1px solid rgba(201,168,76,0.45)', background: 'rgba(201,168,76,0.16)' };
+    if (normalized === 'owner') return { color: '#8dd3ff', border: '1px solid rgba(105,184,255,0.4)', background: 'rgba(69,138,220,0.18)' };
+    if (normalized === 'client') return { color: '#9fe3be', border: '1px solid rgba(76,175,80,0.4)', background: 'rgba(76,175,80,0.18)' };
+    if (normalized === 'operator') return { color: '#ffb98f', border: '1px solid rgba(255,152,0,0.4)', background: 'rgba(255,152,0,0.18)' };
+    return { color: '#c5cad3', border: '1px solid rgba(148,163,184,0.35)', background: 'rgba(148,163,184,0.12)' };
+  };
+  const getActionBadgeStyle = (action) => {
+    const text = String(action || '').toLowerCase();
+    if (text.startsWith('security.')) return { color: '#ff9aa8', border: '1px solid rgba(233,69,96,0.45)', background: 'rgba(233,69,96,0.15)' };
+    if (text.includes('approve')) return { color: '#9fe3be', border: '1px solid rgba(76,175,80,0.45)', background: 'rgba(76,175,80,0.15)' };
+    if (text.includes('retry')) return { color: '#ffd798', border: '1px solid rgba(255,176,64,0.45)', background: 'rgba(255,176,64,0.15)' };
+    return { color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.32)', background: 'rgba(201,168,76,0.1)' };
+  };
+  const getActionSeverityIcon = (action) => {
+    const text = String(action || '').toLowerCase();
+    if (text.startsWith('security.')) return '🚨';
+    if (text.includes('retry')) return '⚠️';
+    if (text.includes('approve')) return '✅';
+    if (text.includes('reject')) return '🛑';
+    return 'ℹ️';
+  };
+  const getAuditSeverityMeta = (action) => {
+    const text = String(action || '').toLowerCase();
+    if (text.startsWith('security.')) return { level: 'Critical', rail: '#e94560', glow: 'rgba(233,69,96,0.35)' };
+    if (text.includes('retry') || text.includes('failed')) return { level: 'High', rail: '#ff9800', glow: 'rgba(255,152,0,0.35)' };
+    if (text.includes('reject') || text.includes('delete')) return { level: 'Medium', rail: '#f2c94c', glow: 'rgba(242,201,76,0.35)' };
+    return { level: 'Normal', rail: '#4CAF50', glow: 'rgba(76,175,80,0.35)' };
+  };
+  const copyAuditMetadata = async (row) => {
+    const payload = JSON.stringify(row?.metadata || {}, null, 2);
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(payload);
+      } else {
+        const el = document.createElement('textarea');
+        el.value = payload;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      }
+      setAuditMessage(`Metadata copied for audit #${row?.id || '-'}`);
+      setTimeout(() => setAuditMessage(''), 1800);
+    } catch (_err) {
+      setAuditMessage('Failed to copy metadata');
+      setTimeout(() => setAuditMessage(''), 2200);
+    }
+  };
   const expandedAuditCount = Object.values(expandedAuditRows).filter(Boolean).length;
   const auditVirtual = useMemo(() => {
     const rowHeight = 44;
@@ -632,6 +775,27 @@ const AdminDashboard = () => {
   const mediumCount = visibleSecuritySignals.filter((x) => (x?.metadata?.severity || (x.action?.includes('retry_burst') ? 'HIGH' : 'MEDIUM')) === 'MEDIUM').length;
   const severityMax = Math.max(1, highCount, mediumCount);
   const isSecurityStale = securityLastRefreshedAt ? (securityNow - new Date(securityLastRefreshedAt).getTime()) > 65000 : true;
+  const reconciliationStats = useMemo(() => {
+    const rows = transactionData || [];
+    const creditCount = rows.filter((x) => String(x.type || '').toLowerCase() === 'credit').length;
+    const debitCount = rows.filter((x) => String(x.type || '').toLowerCase() === 'debit').length;
+    const missingRefCount = rows.filter((x) => !(x.reference || x.ref)).length;
+    const totalVolume = rows.reduce((sum, x) => sum + Number(x.amount || 0), 0);
+    const uniqueRefs = new Set(rows.map((x) => x.reference || x.ref).filter(Boolean));
+    const duplicateRefCount = Math.max(0, rows.filter((x) => (x.reference || x.ref)).length - uniqueRefs.size);
+    return { creditCount, debitCount, missingRefCount, duplicateRefCount, totalVolume };
+  }, [transactionData]);
+  const filteredTransactionData = useMemo(() => {
+    return (transactionData || []).filter((tx) => {
+      const channel = inferTxnChannel(tx);
+      const status = inferTxnStatus(tx);
+      const channelOk = txnChannelFilter === 'all' || channel === txnChannelFilter;
+      const statusOk = txnStatusFilter === 'all' || status === txnStatusFilter;
+      return channelOk && statusOk;
+    });
+  }, [transactionData, txnChannelFilter, txnStatusFilter]);
+  const selectedChannelLabel = CHANNEL_OPTIONS.find((x) => x.value === txnChannelFilter)?.label || 'All Channels';
+  const selectedStatusLabel = STATUS_OPTIONS.find((x) => x.value === txnStatusFilter)?.label || 'All Status';
   const blockedRate = (rateTelemetry.allowed + rateTelemetry.blocked) > 0
     ? Math.round((rateTelemetry.blocked / (rateTelemetry.allowed + rateTelemetry.blocked)) * 100)
     : 0;
@@ -686,6 +850,59 @@ const AdminDashboard = () => {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+  };
+  const exportReconciliationCsv = async () => {
+    try {
+      const token = localStorage.getItem('machineos_token');
+      const params = new URLSearchParams();
+      if (reconFrom) params.set('from', reconFrom);
+      if (reconTo) params.set('to', reconTo);
+      const qs = params.toString();
+      const resp = await fetch(`${API_BASE_URL}/api/admin/transactions/reconciliation-export.csv${qs ? `?${qs}` : ''}`, {
+        headers: {
+          Authorization: `Bearer ${token || ''}`,
+        },
+      });
+      if (!resp.ok) throw new Error(`Export failed: ${resp.status}`);
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `transactions-reconciliation-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      alert(`Unable to export reconciliation CSV: ${error.message}`);
+    }
+  };
+  const handlePremiumButtonHover = (event) => {
+    event.currentTarget.style.transform = 'translateY(-1px)';
+    event.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.25), inset 0 -10px 18px rgba(10,18,30,0.35), 0 0 0 1px rgba(245,216,138,0.35)';
+    event.currentTarget.style.filter = 'brightness(1.06)';
+  };
+  const handlePremiumButtonLeave = (event) => {
+    event.currentTarget.style.transform = 'translateY(0)';
+    event.currentTarget.style.boxShadow = s.downloadBtn.boxShadow;
+    event.currentTarget.style.filter = 'brightness(1)';
+  };
+  const handlePremiumButtonDown = (event) => {
+    event.currentTarget.style.transform = 'translateY(1px)';
+    event.currentTarget.style.boxShadow = '0 4px 10px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.16), inset 0 -6px 12px rgba(10,18,30,0.45)';
+  };
+  const handlePremiumButtonUp = (event) => {
+    handlePremiumButtonHover(event);
+  };
+  const openDatePicker = (inputRef) => {
+    const input = inputRef?.current;
+    if (!input) return;
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+      return;
+    }
+    input.focus();
+    input.click();
   };
 
   return (
@@ -1288,12 +1505,29 @@ const AdminDashboard = () => {
                 </div>
               ))}
             </div>
+            <div style={{ ...s.tableCard, marginBottom: '16px' }}>
+              <h3 style={s.tableTitle}>🧠 Reconciliation Snapshot</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: isSmall ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: '10px' }}>
+                {[
+                  { label: 'Credits', value: reconciliationStats.creditCount },
+                  { label: 'Debits', value: reconciliationStats.debitCount },
+                  { label: 'Missing Ref', value: reconciliationStats.missingRefCount },
+                  { label: 'Duplicate Ref', value: reconciliationStats.duplicateRefCount },
+                  { label: 'Txn Volume', value: `Rs.${reconciliationStats.totalVolume.toLocaleString('en-IN')}` },
+                ].map((item) => (
+                  <div key={item.label} style={{ background: 'rgba(0,0,0,0.28)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: '8px', padding: '10px', textAlign: 'center' }}>
+                    <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>{item.label}</p>
+                    <p style={{ color: '#c9a84c', fontWeight: '700', fontSize: '13px', margin: 0 }}>{item.value}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
             <div style={s.tableCard}>
               <h3 style={s.tableTitle}>💳 Client Wallet Status</h3>
               <div style={{ overflowX: 'auto' }}>
                 <table style={s.table}>
                   <thead>
-                    <tr>{['Client', 'Email', 'Phone', 'Bookings', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+                    <tr>{['Client', 'Email', 'Phone', 'Bookings', 'Wallet', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
                     {clientUsers.map((c, i) => (
@@ -1496,26 +1730,50 @@ const AdminDashboard = () => {
 
         {!loading && activeTab === 'audit' && (
           <div style={s.tableCard}>
-            <h3 style={s.tableTitle}>Audit Logs ({visibleAuditLogs.length})</h3>
+            <div style={{ border: '1px solid rgba(201,168,76,0.28)', borderRadius: '14px', padding: '12px', marginBottom: '12px', background: 'radial-gradient(circle at 12% -20%, rgba(201,168,76,0.2), transparent 38%), linear-gradient(160deg, rgba(12,24,40,0.95), rgba(5,10,20,0.96))' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <h3 style={{ ...s.tableTitle, marginBottom: 0 }}>⚡ Audit Command Center</h3>
+                <span style={{ color: '#f2d78b', fontSize: '11px', background: 'rgba(201,168,76,0.13)', border: '1px solid rgba(201,168,76,0.38)', padding: '4px 9px', borderRadius: '999px', boxShadow: '0 0 16px rgba(201,168,76,0.2)' }}>
+                  ULTRA PREMIUM MODE
+                </span>
+              </div>
+              <p style={{ color: '#8fa1b7', margin: '6px 0 0', fontSize: '12px' }}>
+                Real-time forensic visibility for authentication, admin actions, and system security events.
+              </p>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: isSmall ? 'repeat(2, 1fr)' : 'repeat(5, minmax(120px, 1fr))', gap: '8px', marginBottom: '12px' }}>
+              {[
+                { label: 'Total', value: visibleAuditLogs.length, color: '#f7df9b' },
+                { label: 'Security', value: securityAuditCount, color: '#ff9aa8' },
+                { label: 'Actors', value: uniqueAuditActors, color: '#8dd3ff' },
+                { label: 'Admin', value: auditRoleCounts.admin, color: '#f6d98a' },
+                { label: 'Non-Admin', value: auditRoleCounts.owner + auditRoleCounts.client + auditRoleCounts.operator + auditRoleCounts.unknown, color: '#9fe3be' },
+              ].map((item) => (
+                <div key={item.label} style={{ background: 'linear-gradient(165deg, rgba(20,34,54,0.92), rgba(8,14,24,0.96))', border: '1px solid rgba(201,168,76,0.26)', borderRadius: '12px', padding: '10px 11px', boxShadow: '0 10px 26px rgba(0,0,0,0.34), inset 0 1px 0 rgba(255,255,255,0.05)' }}>
+                  <p style={{ color: '#8896a8', margin: 0, fontSize: '10px', letterSpacing: '0.4px', textTransform: 'uppercase' }}>{item.label}</p>
+                  <p style={{ color: item.color, margin: '4px 0 0', fontSize: '20px', fontWeight: 800 }}>{item.value}</p>
+                </div>
+              ))}
+            </div>
             {auditMessage && (
               <div style={{ background: auditMessage.toLowerCase().includes('error') ? 'rgba(233,69,96,0.14)' : 'rgba(76,175,80,0.12)', border: auditMessage.toLowerCase().includes('error') ? '1px solid rgba(233,69,96,0.45)' : '1px solid rgba(76,175,80,0.4)', color: auditMessage.toLowerCase().includes('error') ? '#ff9aa8' : '#4CAF50', borderRadius: '8px', padding: '8px 10px', marginBottom: '10px', fontSize: '12px' }}>
                 {auditMessage}
               </div>
             )}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', flexWrap: 'wrap', padding: '10px', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '12px', background: 'linear-gradient(170deg, rgba(16,30,48,0.72), rgba(7,14,25,0.82))' }}>
               <input
                 value={auditActionFilter}
                 onChange={(e) => setAuditActionFilter(e.target.value)}
                 placeholder="Filter action (e.g. dlq_retry)"
-                style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}
+                style={{ background: 'rgba(3,8,16,0.6)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '8px', padding: '7px 10px' }}
               />
               <input
                 value={auditActorFilter}
                 onChange={(e) => setAuditActorFilter(e.target.value)}
                 placeholder="Filter actorId"
-                style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}
+                style={{ background: 'rgba(3,8,16,0.6)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '8px', padding: '7px 10px' }}
               />
-              <select value={auditRoleFilter} onChange={(e) => setAuditRoleFilter(e.target.value)} style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}>
+              <select value={auditRoleFilter} onChange={(e) => setAuditRoleFilter(e.target.value)} style={{ background: 'rgba(3,8,16,0.6)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '8px', padding: '7px 10px' }}>
                 <option value="">All Roles</option>
                 <option value="admin">admin</option>
                 <option value="owner">owner</option>
@@ -1526,13 +1784,13 @@ const AdminDashboard = () => {
                 value={auditEntityFilter}
                 onChange={(e) => setAuditEntityFilter(e.target.value)}
                 placeholder="Entity type (e.g. dead_letter_queue)"
-                style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}
+                style={{ background: 'rgba(3,8,16,0.6)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '8px', padding: '7px 10px' }}
               />
               <input
                 value={auditMetaFilter}
                 onChange={(e) => setAuditMetaFilter(e.target.value)}
                 placeholder="Search metadata JSON"
-                style={{ background: 'rgba(0,0,0,0.3)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '6px', padding: '6px 8px' }}
+                style={{ background: 'rgba(3,8,16,0.6)', color: '#e8e0d0', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '8px', padding: '7px 10px' }}
               />
               <input
                 type="datetime-local"
@@ -1579,52 +1837,88 @@ const AdminDashboard = () => {
               <p style={{ color: '#8896a8', textAlign: 'center', padding: '20px' }}>No audit logs</p>
             ) : (
               <div>
-                <table style={s.table}>
-                  <thead><tr>{['When', 'Action', 'Actor', 'Role', 'Entity', 'Entity ID', 'Meta'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr></thead>
-                </table>
                 <div
-                  style={{ maxHeight: '430px', overflowY: 'auto', border: '1px solid rgba(201,168,76,0.12)', borderRadius: '8px' }}
+                  style={{
+                    maxHeight: '430px',
+                    overflowY: 'auto',
+                    border: '1px solid rgba(201,168,76,0.24)',
+                    borderRadius: '12px',
+                    padding: '10px',
+                    background: 'linear-gradient(180deg, rgba(9,17,30,0.92), rgba(5,10,18,0.96))',
+                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05), 0 16px 30px rgba(0,0,0,0.3)',
+                  }}
                   onScroll={(e) => setAuditScrollTop(e.target.scrollTop)}
                 >
-                  <table style={{ ...s.table, minWidth: '100%' }}>
-                    <tbody>
-                      {auditVirtualWindow.useVirtual && auditVirtualWindow.topPad > 0 && (
-                        <tr><td colSpan={7} style={{ padding: 0, height: `${auditVirtualWindow.topPad}px` }} /></tr>
+                  {auditVirtualWindow.useVirtual && auditVirtualWindow.topPad > 0 && (
+                    <div style={{ height: `${auditVirtualWindow.topPad}px` }} />
+                  )}
+                  {auditVirtualWindow.items.map((row) => (
+                    (() => {
+                      const severity = getAuditSeverityMeta(row.action);
+                      return (
+                    <div
+                      key={row.id}
+                      style={{
+                        border: `1px solid ${severity.glow}`,
+                        borderLeft: `4px solid ${severity.rail}`,
+                        borderRadius: '14px',
+                        padding: '12px 13px',
+                        marginBottom: '10px',
+                        background: 'linear-gradient(155deg, rgba(18,32,50,0.92), rgba(8,15,26,0.98))',
+                        boxShadow: `0 10px 24px rgba(0,0,0,0.28), 0 0 22px ${severity.glow}`,
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span style={{ color: '#9aa8bb', fontSize: '11px', background: 'rgba(9,17,31,0.65)', border: '1px solid rgba(148,163,184,0.22)', borderRadius: '999px', padding: '2px 8px' }}>
+                            {row.created_at ? new Date(row.created_at).toLocaleString('en-IN') : '-'}
+                          </span>
+                          <span style={{ ...getActionBadgeStyle(row.action), borderRadius: '999px', padding: '2px 9px', fontSize: '11px', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px' }}>
+                            <span aria-hidden>{getActionSeverityIcon(row.action)}</span>
+                            {row.action}
+                          </span>
+                          <span style={{ color: severity.rail, border: `1px solid ${severity.glow}`, background: 'rgba(6,12,22,0.7)', borderRadius: '999px', padding: '2px 8px', fontSize: '11px', fontWeight: 700 }}>
+                            {severity.level}
+                          </span>
+                          <span style={{ ...getRoleBadgeStyle(row.actor_role), borderRadius: '999px', padding: '2px 9px', fontSize: '11px', fontWeight: 600, textTransform: 'lowercase' }}>
+                            {row.actor_role || '-'}
+                          </span>
+                        </div>
+                        <button
+                          style={{ background: 'rgba(201,168,76,0.14)', border: '1px solid rgba(201,168,76,0.35)', color: '#f6d98a', padding: '4px 10px', borderRadius: '7px', cursor: 'pointer', fontSize: '11px' }}
+                          onClick={() => setExpandedAuditRows((prev) => ({ ...prev, [row.id]: !prev[row.id] }))}
+                        >
+                          {expandedAuditRows[row.id] ? 'Hide Details' : 'View Details'}
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap', fontSize: '11px' }}>
+                        <span style={{ color: '#a7b4c6', background: 'rgba(148,163,184,0.12)', border: '1px solid rgba(148,163,184,0.24)', borderRadius: '999px', padding: '2px 8px' }}>Actor: {row.actor_id || '-'}</span>
+                        <span style={{ color: '#a7b4c6', background: 'rgba(148,163,184,0.12)', border: '1px solid rgba(148,163,184,0.24)', borderRadius: '999px', padding: '2px 8px' }}>Entity: {row.entity_type || '-'}</span>
+                        <span style={{ color: '#a7b4c6', background: 'rgba(148,163,184,0.12)', border: '1px solid rgba(148,163,184,0.24)', borderRadius: '999px', padding: '2px 8px' }}>ID: {row.entity_id || '-'}</span>
+                      </div>
+                      {expandedAuditRows[row.id] && (
+                        <div style={{ marginTop: '10px' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+                            <button
+                              type="button"
+                              onClick={() => copyAuditMetadata(row)}
+                              style={{ background: 'rgba(201,168,76,0.14)', border: '1px solid rgba(201,168,76,0.35)', color: '#f7df9b', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontSize: '11px' }}
+                            >
+                              Copy JSON
+                            </button>
+                          </div>
+                          <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#d2d8e2', fontSize: '11px', background: 'linear-gradient(170deg, rgba(10,19,31,0.9), rgba(5,10,18,0.95))', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '8px', padding: '10px' }}>
+                            {JSON.stringify(row.metadata || {}, null, 2)}
+                          </pre>
+                        </div>
                       )}
-                      {auditVirtualWindow.items.map((row) => (
-                        <React.Fragment key={row.id}>
-                          <tr style={s.tr}>
-                            <td style={s.td}>{row.created_at ? new Date(row.created_at).toLocaleString('en-IN') : '-'}</td>
-                            <td style={s.td}>{row.action}</td>
-                            <td style={s.td}>{row.actor_id || '-'}</td>
-                            <td style={s.td}>{row.actor_role || '-'}</td>
-                            <td style={s.td}>{row.entity_type || '-'}</td>
-                            <td style={s.td}>{row.entity_id || '-'}</td>
-                            <td style={s.td}>
-                              <button
-                                style={{ background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', color: '#c9a84c', padding: '3px 8px', borderRadius: '6px', cursor: 'pointer', fontSize: '11px' }}
-                                onClick={() => setExpandedAuditRows((prev) => ({ ...prev, [row.id]: !prev[row.id] }))}
-                              >
-                                {expandedAuditRows[row.id] ? 'Hide' : 'View'}
-                              </button>
-                            </td>
-                          </tr>
-                          {expandedAuditRows[row.id] && (
-                            <tr style={s.tr}>
-                              <td style={s.td} colSpan={7}>
-                                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#8896a8', fontSize: '11px' }}>
-                                  {JSON.stringify(row.metadata || {}, null, 2)}
-                                </pre>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      ))}
-                      {auditVirtualWindow.useVirtual && auditVirtualWindow.bottomPad > 0 && (
-                        <tr><td colSpan={7} style={{ padding: 0, height: `${auditVirtualWindow.bottomPad}px` }} /></tr>
-                      )}
-                    </tbody>
-                  </table>
+                    </div>
+                      );
+                    })()
+                  ))}
+                  {auditVirtualWindow.useVirtual && auditVirtualWindow.bottomPad > 0 && (
+                    <div style={{ height: `${auditVirtualWindow.bottomPad}px` }} />
+                  )}
                 </div>
                 {auditHasMore && (
                   <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'center' }}>
@@ -1665,36 +1959,204 @@ const AdminDashboard = () => {
             <div style={s.tableCard}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', flexWrap: 'wrap', gap: '10px' }}>
                 <h3 style={s.tableTitle}>📋 Transaction Ledger</h3>
-                <button style={s.downloadBtn} onClick={() => generateInternalLedger({
-                  txnId: 'DE/TXN/INT/2026/041001',
-                  date: new Date().toLocaleDateString('en-IN'),
-                  bookingId: 'BK-2026-041001',
-                  clientName: 'Patil Builders Pvt. Ltd.',
-                  ownerName: 'Rajesh Patil',
-                  grossAmount: 105000,
-                  commissionPct: 15,
-                  hours: 75,
-                  ratePerHour: 1400,
-                })}>📋 Internal Ledger PDF</button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsChannelOpen((v) => !v);
+                        setIsStatusOpen(false);
+                      }}
+                      style={{ ...s.downloadBtn, minWidth: '170px', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                    >
+                      <span>{selectedChannelLabel}</span>
+                      <span style={{ opacity: 0.9 }}>{isChannelOpen ? '▲' : '▼'}</span>
+                    </button>
+                    {isChannelOpen && (
+                      <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 20, minWidth: '100%', background: 'linear-gradient(170deg, rgba(16,30,48,0.98), rgba(7,14,25,0.98))', border: '1px solid rgba(234,196,112,0.38)', borderRadius: '10px', boxShadow: '0 14px 28px rgba(0,0,0,0.45)' }}>
+                        {CHANNEL_OPTIONS.map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => {
+                              setTxnChannelFilter(opt.value);
+                              setIsChannelOpen(false);
+                            }}
+                            style={{ width: '100%', background: txnChannelFilter === opt.value ? 'rgba(234,196,112,0.18)' : 'transparent', border: 'none', color: txnChannelFilter === opt.value ? '#f7df9b' : '#d8dbe4', padding: '9px 10px', textAlign: 'left', cursor: 'pointer', fontSize: '12px' }}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ position: 'relative' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsStatusOpen((v) => !v);
+                        setIsChannelOpen(false);
+                      }}
+                      style={{ ...s.downloadBtn, minWidth: '150px', textAlign: 'left', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                    >
+                      <span>{selectedStatusLabel}</span>
+                      <span style={{ opacity: 0.9 }}>{isStatusOpen ? '▲' : '▼'}</span>
+                    </button>
+                    {isStatusOpen && (
+                      <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 20, minWidth: '100%', background: 'linear-gradient(170deg, rgba(16,30,48,0.98), rgba(7,14,25,0.98))', border: '1px solid rgba(234,196,112,0.38)', borderRadius: '10px', boxShadow: '0 14px 28px rgba(0,0,0,0.45)' }}>
+                        {STATUS_OPTIONS.map((opt) => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => {
+                              setTxnStatusFilter(opt.value);
+                              setIsStatusOpen(false);
+                            }}
+                            style={{ width: '100%', background: txnStatusFilter === opt.value ? 'rgba(234,196,112,0.18)' : 'transparent', border: 'none', color: txnStatusFilter === opt.value ? '#f7df9b' : '#d8dbe4', padding: '9px 10px', textAlign: 'left', cursor: 'pointer', fontSize: '12px' }}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    style={s.downloadBtn}
+                    onMouseEnter={handlePremiumButtonHover}
+                    onMouseLeave={handlePremiumButtonLeave}
+                    onMouseDown={handlePremiumButtonDown}
+                    onMouseUp={handlePremiumButtonUp}
+                    onClick={() => {
+                      const r = getLastDaysRange(7);
+                      setReconFrom(r.from);
+                      setReconTo(r.to);
+                    }}
+                  >
+                    Last 7 Days
+                  </button>
+                  <button
+                    style={s.downloadBtn}
+                    onMouseEnter={handlePremiumButtonHover}
+                    onMouseLeave={handlePremiumButtonLeave}
+                    onMouseDown={handlePremiumButtonDown}
+                    onMouseUp={handlePremiumButtonUp}
+                    onClick={() => {
+                      const r = getLastDaysRange(30);
+                      setReconFrom(r.from);
+                      setReconTo(r.to);
+                    }}
+                  >
+                    Last 30 Days
+                  </button>
+                  <button
+                    style={s.downloadBtn}
+                    onMouseEnter={handlePremiumButtonHover}
+                    onMouseLeave={handlePremiumButtonLeave}
+                    onMouseDown={handlePremiumButtonDown}
+                    onMouseUp={handlePremiumButtonUp}
+                    onClick={() => {
+                      const r = getCurrentMonthRange();
+                      setReconFrom(r.from);
+                      setReconTo(r.to);
+                    }}
+                  >
+                    This Month
+                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 10px', borderRadius: '11px', background: 'linear-gradient(145deg, rgba(255,220,140,0.16), rgba(160,120,48,0.22) 55%, rgba(11,20,34,0.8))', border: '1px solid rgba(234,196,112,0.45)', boxShadow: '0 8px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -10px 18px rgba(10,18,30,0.35)' }}>
+                    <span style={{ color: '#f5d88a', fontSize: '12px', fontWeight: 700 }}>Range</span>
+                    <button
+                      type="button"
+                      onClick={() => openDatePicker(reconFromInputRef)}
+                      style={{ position: 'relative', background: 'rgba(9,17,30,0.55)', color: '#f8e6b6', border: '1px solid rgba(234,196,112,0.35)', borderRadius: '6px', outline: 'none', padding: '5px 28px 5px 8px', minWidth: '118px', textAlign: 'left', cursor: 'pointer' }}
+                      title="From date"
+                    >
+                      <span>{reconFrom || 'From'}</span>
+                      <span style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', color: '#f7df9b', fontSize: '12px', opacity: 0.9 }}>▼</span>
+                    </button>
+                    <input
+                      ref={reconFromInputRef}
+                      type="date"
+                      value={reconFrom}
+                      onChange={(e) => setReconFrom(e.target.value)}
+                      style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}
+                      title="From date hidden picker"
+                      tabIndex={-1}
+                    />
+                    <span style={{ color: 'rgba(245,216,138,0.9)', fontSize: '12px' }}>→</span>
+                    <button
+                      type="button"
+                      onClick={() => openDatePicker(reconToInputRef)}
+                      style={{ position: 'relative', background: 'rgba(9,17,30,0.55)', color: '#f8e6b6', border: '1px solid rgba(234,196,112,0.35)', borderRadius: '6px', outline: 'none', padding: '5px 28px 5px 8px', minWidth: '118px', textAlign: 'left', cursor: 'pointer' }}
+                      title="To date"
+                    >
+                      <span>{reconTo || 'To'}</span>
+                      <span style={{ position: 'absolute', right: '8px', top: '50%', transform: 'translateY(-50%)', color: '#f7df9b', fontSize: '12px', opacity: 0.9 }}>▼</span>
+                    </button>
+                    <input
+                      ref={reconToInputRef}
+                      type="date"
+                      value={reconTo}
+                      onChange={(e) => setReconTo(e.target.value)}
+                      style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}
+                      title="To date hidden picker"
+                      tabIndex={-1}
+                    />
+                  </div>
+                  <button
+                    style={s.downloadBtn}
+                    onMouseEnter={handlePremiumButtonHover}
+                    onMouseLeave={handlePremiumButtonLeave}
+                    onMouseDown={handlePremiumButtonDown}
+                    onMouseUp={handlePremiumButtonUp}
+                    onClick={exportReconciliationCsv}
+                  >
+                    ⬇ Reconciliation CSV
+                  </button>
+                  <button
+                    style={s.downloadBtn}
+                    onMouseEnter={handlePremiumButtonHover}
+                    onMouseLeave={handlePremiumButtonLeave}
+                    onMouseDown={handlePremiumButtonDown}
+                    onMouseUp={handlePremiumButtonUp}
+                    onClick={() => generateInternalLedger({
+                    txnId: 'DE/TXN/INT/2026/041001',
+                    date: new Date().toLocaleDateString('en-IN'),
+                    bookingId: 'BK-2026-041001',
+                    clientName: 'Patil Builders Pvt. Ltd.',
+                    ownerName: 'Rajesh Patil',
+                    grossAmount: 105000,
+                    commissionPct: 15,
+                    hours: 75,
+                    ratePerHour: 1400,
+                  })}
+                  >
+                    📋 Internal Ledger PDF
+                  </button>
+                </div>
               </div>
               <div style={{ overflowX: 'auto' }}>
                 <table style={s.table}>
                   <thead>
-                    <tr>{['Ref ID', 'Date', 'Type', 'Amount', 'GST', 'Total', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
+                    <tr>{['Ref ID', 'Date', 'Type', 'Channel', 'Amount', 'GST', 'Total', 'Status'].map(h => <th key={h} style={s.th}>{h}</th>)}</tr>
                   </thead>
                   <tbody>
-                    {transactionData.length > 0 ? transactionData.map((t, i) => (
+                    {filteredTransactionData.length > 0 ? filteredTransactionData.map((t, i) => (
                       <tr key={i} style={s.tr}>
-                        <td style={{ ...s.td, color: '#c9a84c', fontSize: '11px' }}>{t.ref || 'N/A'}</td>
+                        <td style={{ ...s.td, color: '#c9a84c', fontSize: '11px' }}>{t.reference || t.ref || 'N/A'}</td>
                         <td style={s.td}>{t.created_at ? new Date(t.created_at).toLocaleDateString('en-IN') : 'N/A'}</td>
                         <td style={s.td}><span style={{ color: t.type === 'credit' ? '#4CAF50' : '#e94560' }}>{t.type}</span></td>
+                        <td style={s.td}><span style={{ color: '#8896a8' }}>{inferTxnChannel(t)}</span></td>
                         <td style={s.td}>Rs.{(t.amount || 0).toLocaleString('en-IN')}</td>
                         <td style={s.td}>Rs.{Math.round((t.amount || 0) * 0.18).toLocaleString('en-IN')}</td>
                         <td style={{ ...s.td, color: '#c9a84c', fontWeight: '700' }}>Rs.{Math.round((t.amount || 0) * 1.18).toLocaleString('en-IN')}</td>
-                        <td style={s.td}><span style={{ color: '#4CAF50' }}>✅</span></td>
+                        <td style={s.td}>
+                          <span style={{ color: inferTxnStatus(t) === 'failed' ? '#e94560' : inferTxnStatus(t) === 'reversed' ? '#FF9800' : '#4CAF50' }}>
+                            {inferTxnStatus(t)}
+                          </span>
+                        </td>
                       </tr>
                     )) : (
-                      <tr><td colSpan="7" style={{ ...s.td, textAlign: 'center', color: '#8896a8' }}>No transactions found</td></tr>
+                      <tr><td colSpan="8" style={{ ...s.td, textAlign: 'center', color: '#8896a8' }}>No transactions found</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -1711,7 +2173,7 @@ const AdminDashboard = () => {
                 </div>
               )}
               <p style={{ color: '#8896a8', fontSize: '11px', textAlign: 'center', margin: '8px 0 0' }}>
-                Loaded {transactionData.length} transactions{transactionsHasMore ? ' (more available)' : ' (all loaded)'}
+                Showing {filteredTransactionData.length} / {transactionData.length} transactions{transactionsHasMore ? ' (more available)' : ' (all loaded)'}
               </p>
             </div>
           </div>
@@ -1814,7 +2276,21 @@ const s = {
   alertRow: { padding: '10px 12px', marginBottom: '8px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px' },
   alertMsg: { color: '#e8e0d0', fontSize: '12px', margin: '0 0 3px 0' },
   alertTime: { color: '#8896a8', fontSize: '10px', margin: 0 },
-  downloadBtn: { background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', color: '#c9a84c', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' },
+  downloadBtn: {
+    background: 'linear-gradient(145deg, rgba(255,220,140,0.24), rgba(160,120,48,0.28) 55%, rgba(11,20,34,0.78))',
+    border: '1px solid rgba(234,196,112,0.55)',
+    color: '#f5d88a',
+    padding: '8px 16px',
+    borderRadius: '11px',
+    cursor: 'pointer',
+    fontSize: '13px',
+    fontWeight: '700',
+    letterSpacing: '0.2px',
+    boxShadow: '0 8px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.22), inset 0 -10px 18px rgba(10,18,30,0.35)',
+    textShadow: '0 1px 0 rgba(0,0,0,0.45)',
+    backdropFilter: 'blur(4px)',
+    transition: 'all 0.2s ease',
+  },
 };
 
 export default AdminDashboard;

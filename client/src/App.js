@@ -11,15 +11,18 @@ const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:500
 
 function ProtectedRoute({ role, children, authReady, user }) {
   const token = localStorage.getItem('machineos_token');
-  // `user` state हे App mount झाल्यावरच fetch होत असल्याने login नंतर ते null राहू शकते.
-  // म्हणून localStorage मधून user पुन्हा वाचून route guard योग्यरित्या लागू करतो.
-  let storedUser = user;
+  // Prefer latest localStorage user so post-login role switches are immediate.
+  // `sessionUser` can be stale from a previous session until `/me` refresh completes.
+  let storedUser = null;
   if (!storedUser) {
     try {
       storedUser = JSON.parse(localStorage.getItem('machineos_user') || 'null');
     } catch (_err) {
       storedUser = null;
     }
+  }
+  if (!storedUser && user) {
+    storedUser = user;
   }
   if (!authReady) {
     return <div style={{ color: '#c9a84c', textAlign: 'center', paddingTop: '20vh' }}>Validating session...</div>;
