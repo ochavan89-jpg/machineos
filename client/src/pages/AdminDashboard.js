@@ -307,6 +307,9 @@ const AdminDashboard = () => {
         return { telemetry, secLogs, failedLoginLogs, ackLogs, apiHealth, error: '' };
       }
       lastError = telemetry?.error || secLogs?.error || failedLoginLogs?.error || ackLogs?.error || apiHealth?.error || 'security panel fetch failed';
+      if (lastError === 'auth_required') {
+        return { telemetry, secLogs, failedLoginLogs, ackLogs, apiHealth, error: lastError };
+      }
       if (attempt < maxAttempts) {
         await waitMs(250 * (2 ** (attempt - 1)));
       }
@@ -467,6 +470,7 @@ const AdminDashboard = () => {
     setIssuesLoadingMore(false);
   };
   const refreshSecurityPanel = useCallback(async () => {
+    if (!localStorage.getItem('machineos_token')) return;
     setSecurityRefreshing(true);
     const securityData = await fetchSecurityDataWithRetry(3);
     const telemetrySnapshot = securityData.telemetry || { allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0 };
@@ -488,7 +492,11 @@ const AdminDashboard = () => {
     });
     setAcknowledgedSignalIds(ackMap);
     setSecurityLastRefreshedAt(new Date().toISOString());
-    setSecurityPanelMessage(securityData.error ? `Security panel retry exhausted: ${securityData.error.slice(0, 120)}` : '');
+    setSecurityPanelMessage(
+      securityData.error === 'auth_required'
+        ? 'Session expired. Please login again.'
+        : (securityData.error ? `Security panel retry exhausted: ${securityData.error.slice(0, 120)}` : ''),
+    );
     setSecurityRefreshing(false);
   }, [fetchSecurityDataWithRetry, pushTelemetrySnapshot]);
   useEffect(() => {

@@ -1,8 +1,21 @@
 import { supabase } from './supabaseClient';
 const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:5000';
+const AUTH_REQUIRED_ERROR = 'auth_required';
+
+const clearAuthStorage = () => {
+  localStorage.removeItem('machineos_user');
+  localStorage.removeItem('machineos_token');
+  localStorage.removeItem('machineos_refresh_token');
+};
+
+const isAuthRequiredError = (error) => (error?.message || '') === AUTH_REQUIRED_ERROR;
 
 async function secureFetch(path, options = {}) {
   let token = localStorage.getItem('machineos_token');
+  if (!token) {
+    clearAuthStorage();
+    throw new Error(AUTH_REQUIRED_ERROR);
+  }
   const execute = async (activeToken) => fetch(`${API_BASE_URL}${path}`, {
     ...options,
     headers: {
@@ -30,6 +43,10 @@ async function secureFetch(path, options = {}) {
         }
       }
     }
+    if (response.status === 401) {
+      clearAuthStorage();
+      throw new Error(AUTH_REQUIRED_ERROR);
+    }
   }
 
   const payload = await response.json().catch(() => ({}));
@@ -50,7 +67,7 @@ async function fetchAdminPage(endpoint, { limit = 250, offset = 0 } = {}) {
       error: '',
     };
   } catch (error) {
-    console.error(error);
+    if (!isAuthRequiredError(error)) console.error(error);
     return { items: [], hasMore: false, nextOffset: null, error: error?.message || `Failed to fetch ${endpoint}` };
   }
 }
@@ -494,7 +511,7 @@ export const getRateLimitTelemetry = async () => {
   try {
     return await secureFetch('/api/admin/telemetry/rate-limit');
   } catch (error) {
-    console.error(error);
+    if (!isAuthRequiredError(error)) console.error(error);
     return { allowed: 0, blocked: 0, byRoute: [], activeBuckets: 0, error: error?.message || 'Failed to fetch telemetry' };
   }
 };
@@ -551,7 +568,7 @@ export const getAuditLogs = async (filters = {}) => {
       error: '',
     };
   } catch (error) {
-    console.error(error);
+    if (!isAuthRequiredError(error)) console.error(error);
     return { items: [], nextCursor: null, hasMore: false, error: error?.message || 'Failed to fetch audit logs' };
   }
 };
