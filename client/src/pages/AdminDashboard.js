@@ -233,6 +233,7 @@ const AdminDashboard = () => {
   const [securityLastRefreshedAt, setSecurityLastRefreshedAt] = useState(null);
   const [securityNow, setSecurityNow] = useState(Date.now());
   const [securityPanelMessage, setSecurityPanelMessage] = useState('');
+  const auditActionInputRef = useRef(null);
   const auditFromInputRef = useRef(null);
   const auditToInputRef = useRef(null);
   const getCurrentAdminId = () => {
@@ -648,6 +649,34 @@ const AdminDashboard = () => {
     if (text.includes('reject') || text.includes('delete')) return { level: 'Medium', rail: '#f2c94c', glow: 'rgba(242,201,76,0.35)' };
     return { level: 'Normal', rail: '#4CAF50', glow: 'rgba(76,175,80,0.35)' };
   };
+  const auditSeverityCounts = useMemo(() => {
+    const bucket = { Critical: 0, High: 0, Medium: 0, Normal: 0 };
+    (visibleAuditLogs || []).forEach((row) => {
+      const level = getAuditSeverityMeta(row?.action).level;
+      bucket[level] = (bucket[level] || 0) + 1;
+    });
+    return bucket;
+  }, [visibleAuditLogs]);
+  const copyAuditEvent = async (row) => {
+    const payload = JSON.stringify(row || {}, null, 2);
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(payload);
+      } else {
+        const el = document.createElement('textarea');
+        el.value = payload;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      }
+      setAuditMessage(`Full audit event copied #${row?.id || '-'}`);
+      setTimeout(() => setAuditMessage(''), 1800);
+    } catch (_err) {
+      setAuditMessage('Failed to copy full event');
+      setTimeout(() => setAuditMessage(''), 2200);
+    }
+  };
   const copyAuditMetadata = async (row) => {
     const payload = JSON.stringify(row?.metadata || {}, null, 2);
     try {
@@ -955,6 +984,15 @@ const AdminDashboard = () => {
     event.currentTarget.style.transform = 'translateX(0) translateY(0)';
     event.currentTarget.style.boxShadow = '';
   };
+  const handleAuditRowHover = (event) => {
+    event.currentTarget.style.transform = 'translateY(-1px)';
+    event.currentTarget.style.boxShadow = `${event.currentTarget.style.boxShadow}, inset 0 0 0 1px rgba(255,255,255,0.05)`;
+    event.currentTarget.style.filter = 'brightness(1.04)';
+  };
+  const handleAuditRowLeave = (event) => {
+    event.currentTarget.style.transform = 'translateY(0)';
+    event.currentTarget.style.filter = 'brightness(1)';
+  };
   const openDatePicker = (inputRef) => {
     const input = inputRef?.current;
     if (!input) return;
@@ -965,6 +1003,18 @@ const AdminDashboard = () => {
     input.focus();
     input.click();
   };
+  useEffect(() => {
+    const onKeyDown = (event) => {
+      if (activeTab !== 'audit') return;
+      if (event.key !== '/') return;
+      const tag = (event.target?.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || event.target?.isContentEditable) return;
+      event.preventDefault();
+      auditActionInputRef.current?.focus();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [activeTab]);
 
   return (
     <div style={s.container}>
@@ -1020,8 +1070,9 @@ const AdminDashboard = () => {
               onMouseEnter={handleNavHover}
               onMouseLeave={handleNavLeave}
             >
-              <span>{item.icon}</span>
-              <span>{item.label}</span>
+              <span style={activeTab === item.id ? s.navIconWrapActive : s.navIconWrap}>{item.icon}</span>
+              <span style={s.navLabel}>{item.label}</span>
+              <span style={activeTab === item.id ? s.navChevronActive : s.navChevron}>›</span>
             </button>
           ))}
           <div style={s.divider} />
@@ -1841,6 +1892,34 @@ const AdminDashboard = () => {
                 </div>
               ))}
             </div>
+            <div style={{ marginBottom: '12px', border: '1px solid rgba(201,168,76,0.24)', borderRadius: '12px', padding: '10px 12px', background: 'linear-gradient(168deg, rgba(18,30,48,0.84), rgba(7,14,24,0.9))' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', gap: '8px', flexWrap: 'wrap' }}>
+                <span style={{ color: '#f1d793', fontSize: '11px', fontWeight: 700, letterSpacing: '0.4px' }}>Severity Signal Strip</span>
+                <span style={{ color: '#8ea2b8', fontSize: '11px' }}>Press `/` to focus action filter</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: isSmall ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '8px' }}>
+                {[
+                  { key: 'Critical', color: '#e94560' },
+                  { key: 'High', color: '#ff9800' },
+                  { key: 'Medium', color: '#f2c94c' },
+                  { key: 'Normal', color: '#4CAF50' },
+                ].map((x) => {
+                  const total = Math.max(1, visibleAuditLogs.length);
+                  const pct = Math.max(6, Math.round(((auditSeverityCounts[x.key] || 0) / total) * 100));
+                  return (
+                    <div key={x.key} style={{ border: '1px solid rgba(148,163,184,0.22)', borderRadius: '10px', padding: '7px 8px', background: 'rgba(8,15,26,0.55)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ color: x.color, fontSize: '11px', fontWeight: 700 }}>{x.key}</span>
+                        <span style={{ color: '#d2d8e2', fontSize: '11px' }}>{auditSeverityCounts[x.key] || 0}</span>
+                      </div>
+                      <div style={{ height: '5px', borderRadius: '999px', background: 'rgba(255,255,255,0.08)', overflow: 'hidden' }}>
+                        <div style={{ width: `${pct}%`, height: '100%', borderRadius: '999px', background: `linear-gradient(90deg, ${x.color}, rgba(255,255,255,0.75))` }} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
             {auditMessage && (
               <div style={{ background: auditMessage.toLowerCase().includes('error') ? 'rgba(233,69,96,0.14)' : 'rgba(76,175,80,0.12)', border: auditMessage.toLowerCase().includes('error') ? '1px solid rgba(233,69,96,0.45)' : '1px solid rgba(76,175,80,0.4)', color: auditMessage.toLowerCase().includes('error') ? '#ff9aa8' : '#4CAF50', borderRadius: '8px', padding: '8px 10px', marginBottom: '10px', fontSize: '12px' }}>
                 {auditMessage}
@@ -1850,6 +1929,7 @@ const AdminDashboard = () => {
               <span aria-hidden style={{ position: 'absolute', top: 0, left: '4%', right: '4%', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(255,230,160,0.9), transparent)', opacity: 0.85 }} />
               <span aria-hidden style={{ position: 'absolute', bottom: 0, left: '8%', right: '8%', height: '1px', background: 'linear-gradient(90deg, transparent, rgba(201,168,76,0.55), transparent)', opacity: 0.6 }} />
               <input
+                ref={auditActionInputRef}
                 value={auditActionFilter}
                 onChange={(e) => setAuditActionFilter(e.target.value)}
                 placeholder="Filter action (e.g. dlq_retry)"
@@ -2019,7 +2099,10 @@ const AdminDashboard = () => {
                         marginBottom: '10px',
                         background: 'linear-gradient(155deg, rgba(18,32,50,0.92), rgba(8,15,26,0.98))',
                         boxShadow: `0 10px 24px rgba(0,0,0,0.28), 0 0 22px ${severity.glow}`,
+                        transition: 'transform 0.18s ease, filter 0.18s ease, box-shadow 0.18s ease',
                       }}
+                      onMouseEnter={handleAuditRowHover}
+                      onMouseLeave={handleAuditRowLeave}
                     >
                       <span
                         style={{
@@ -2060,12 +2143,20 @@ const AdminDashboard = () => {
                             {row.actor_role || '-'}
                           </span>
                         </div>
-                        <button
-                          style={{ background: 'rgba(201,168,76,0.14)', border: '1px solid rgba(201,168,76,0.35)', color: '#f6d98a', padding: '4px 10px', borderRadius: '7px', cursor: 'pointer', fontSize: '11px' }}
-                          onClick={() => setExpandedAuditRows((prev) => ({ ...prev, [row.id]: !prev[row.id] }))}
-                        >
-                          {expandedAuditRows[row.id] ? 'Hide Details' : 'View Details'}
-                        </button>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button
+                            style={{ background: 'rgba(109,190,255,0.14)', border: '1px solid rgba(109,190,255,0.4)', color: '#b8e6ff', padding: '4px 10px', borderRadius: '7px', cursor: 'pointer', fontSize: '11px' }}
+                            onClick={() => copyAuditEvent(row)}
+                          >
+                            Copy Event
+                          </button>
+                          <button
+                            style={{ background: 'rgba(201,168,76,0.14)', border: '1px solid rgba(201,168,76,0.35)', color: '#f6d98a', padding: '4px 10px', borderRadius: '7px', cursor: 'pointer', fontSize: '11px' }}
+                            onClick={() => setExpandedAuditRows((prev) => ({ ...prev, [row.id]: !prev[row.id] }))}
+                          >
+                            {expandedAuditRows[row.id] ? 'Hide Details' : 'View Details'}
+                          </button>
+                        </div>
                       </div>
                       <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap', fontSize: '11px' }}>
                         <span style={{ color: '#a7b4c6', background: 'rgba(148,163,184,0.12)', border: '1px solid rgba(148,163,184,0.24)', borderRadius: '999px', padding: '2px 8px' }}>Actor: {row.actor_id || '-'}</span>
@@ -2408,14 +2499,19 @@ const AdminDashboard = () => {
 
 const s = {
   container: { display: 'flex', minHeight: '100vh', background: '#050d1a', fontFamily: 'Arial, sans-serif', color: '#fff' },
-  sidebar: { width: '220px', background: 'linear-gradient(180deg, #0f2040 0%, #0a1628 100%)', borderRight: '1px solid rgba(201,168,76,0.2)', padding: '20px 15px', display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 },
+  sidebar: { width: '232px', background: 'radial-gradient(circle at 8% -20%, rgba(255,225,150,0.18), transparent 35%), linear-gradient(182deg, #102244 0%, #0a1628 48%, #081222 100%)', borderRight: '1px solid rgba(201,168,76,0.26)', padding: '20px 15px', display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0, boxShadow: 'inset -1px 0 0 rgba(255,255,255,0.05), 12px 0 26px rgba(0,0,0,0.24)' },
   sidebarLogo: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' },
   logoCircle: { width: '38px', height: '38px', background: 'linear-gradient(135deg, #a07830, #e2c97e)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '900', color: '#0a1628', fontSize: '13px', flexShrink: 0 },
   logoTitle: { color: '#c9a84c', fontWeight: '700', fontSize: '14px', margin: 0 },
   logoSub: { color: '#8896a8', fontSize: '10px', margin: 0 },
   divider: { height: '1px', background: 'rgba(201,168,76,0.15)', margin: '10px 0' },
-  nav: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.1)', background: 'linear-gradient(145deg, rgba(15,32,64,0.25), rgba(10,22,40,0.55))', color: '#9aa8bb', cursor: 'pointer', fontSize: '13px', width: '100%', textAlign: 'left', transition: 'all 0.2s ease' },
-  navActive: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.45)', background: 'linear-gradient(145deg, rgba(201,168,76,0.22), rgba(39,27,6,0.35) 45%, rgba(9,18,32,0.92))', color: '#f2d78b', cursor: 'pointer', fontSize: '13px', width: '100%', textAlign: 'left', fontWeight: '700', boxShadow: '0 8px 18px rgba(0,0,0,0.28), inset 0 1px 0 rgba(255,255,255,0.18), 0 0 16px rgba(201,168,76,0.22)' },
+  nav: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 11px', borderRadius: '12px', border: '1px solid rgba(201,168,76,0.12)', background: 'linear-gradient(145deg, rgba(15,32,64,0.25), rgba(10,22,40,0.6))', color: '#9aa8bb', cursor: 'pointer', fontSize: '13px', width: '100%', textAlign: 'left', transition: 'all 0.2s ease' },
+  navActive: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 11px', borderRadius: '12px', border: '1px solid rgba(201,168,76,0.52)', background: 'linear-gradient(145deg, rgba(201,168,76,0.24), rgba(39,27,6,0.38) 45%, rgba(9,18,32,0.94))', color: '#f2d78b', cursor: 'pointer', fontSize: '13px', width: '100%', textAlign: 'left', fontWeight: '700', boxShadow: '0 10px 20px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.2), 0 0 18px rgba(201,168,76,0.24)' },
+  navIconWrap: { width: '24px', height: '24px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(8,16,28,0.62)', border: '1px solid rgba(148,163,184,0.2)', flexShrink: 0 },
+  navIconWrapActive: { width: '24px', height: '24px', borderRadius: '8px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(145deg, rgba(201,168,76,0.24), rgba(11,20,35,0.7))', border: '1px solid rgba(201,168,76,0.42)', flexShrink: 0, boxShadow: '0 0 10px rgba(201,168,76,0.24)' },
+  navLabel: { flex: 1 },
+  navChevron: { color: '#6f8197', fontSize: '18px', lineHeight: 1 },
+  navChevronActive: { color: '#f2d78b', fontSize: '18px', lineHeight: 1 },
   logoutBtn: { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(233,69,96,0.3)', background: 'rgba(233,69,96,0.08)', color: '#e94560', cursor: 'pointer', fontSize: '13px', width: '100%', marginTop: 'auto' },
   sidebarFooter: { color: 'rgba(201,168,76,0.4)', fontSize: '9px', textAlign: 'center', marginTop: '10px', letterSpacing: '1px' },
   main: { flex: 1, overflowY: 'auto' },
@@ -2425,12 +2521,12 @@ const s = {
   adminBadge: { display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(201,168,76,0.1)', border: '1px solid rgba(201,168,76,0.3)', padding: '8px 16px', borderRadius: '20px', color: '#c9a84c', fontSize: '13px', fontWeight: '600' },
   adminDot: { width: '8px', height: '8px', background: '#4CAF50', borderRadius: '50%', display: 'inline-block' },
   cardRow: { display: 'grid', gap: '15px', marginBottom: '25px' },
-  card: { background: 'linear-gradient(135deg, #0f2040, #0a1628)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '12px', padding: '18px 15px', textAlign: 'center' },
+  card: { background: 'radial-gradient(circle at 14% -40%, rgba(255,216,125,0.22), transparent 40%), linear-gradient(135deg, #0f2040, #0a1628)', border: '1px solid rgba(201,168,76,0.24)', borderRadius: '14px', padding: '18px 15px', textAlign: 'center', boxShadow: '0 12px 24px rgba(0,0,0,0.26), inset 0 1px 0 rgba(255,255,255,0.06)' },
   cardIcon: { fontSize: '22px', margin: '0 0 8px 0' },
   cardNumber: { color: '#c9a84c', fontSize: '22px', fontWeight: '700', margin: '0 0 4px 0' },
   cardLabel: { color: '#8896a8', fontSize: '11px', margin: '0 0 6px 0' },
   cardChange: { fontSize: '10px', margin: 0 },
-  tableCard: { background: 'linear-gradient(135deg, #0f2040, #0a1628)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '12px', padding: '20px', marginBottom: '25px' },
+  tableCard: { background: 'radial-gradient(circle at 12% -40%, rgba(255,220,140,0.18), transparent 45%), linear-gradient(135deg, #0f2040, #0a1628)', border: '1px solid rgba(201,168,76,0.22)', borderRadius: '14px', padding: '20px', marginBottom: '25px', boxShadow: '0 16px 32px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06)' },
   tableTitle: { color: '#c9a84c', margin: '0 0 15px 0', fontSize: '16px' },
   liveDot: { width: '8px', height: '8px', background: '#4CAF50', borderRadius: '50%', display: 'inline-block' },
   table: { width: '100%', borderCollapse: 'collapse', minWidth: '600px' },
@@ -2442,7 +2538,7 @@ const s = {
   fuelFill: { height: '100%', borderRadius: '2px' },
   statusBadge: { padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' },
   bottomRow: { display: 'grid', gap: '20px' },
-  bottomCard: { background: 'linear-gradient(135deg, #0f2040, #0a1628)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '12px', padding: '20px' },
+  bottomCard: { background: 'radial-gradient(circle at 10% -35%, rgba(255,214,120,0.16), transparent 42%), linear-gradient(135deg, #0f2040, #0a1628)', border: '1px solid rgba(201,168,76,0.22)', borderRadius: '12px', padding: '20px', boxShadow: '0 12px 24px rgba(0,0,0,0.24)' },
   bottomTitle: { color: '#c9a84c', margin: '0 0 15px 0', fontSize: '15px' },
   revenueRow: { display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' },
   revenueLabel: { color: '#8896a8', fontSize: '12px', width: '100px', flexShrink: 0 },
