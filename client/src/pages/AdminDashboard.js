@@ -599,7 +599,12 @@ const AdminDashboard = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handleLogout = () => navigate('/');
+  const handleLogout = () => {
+    localStorage.removeItem('machineos_user');
+    localStorage.removeItem('machineos_token');
+    localStorage.removeItem('machineos_refresh_token');
+    navigate('/login', { replace: true });
+  };
   const clearAuditField = (field) => {
     if (field === 'action') setAuditActionFilter('');
     if (field === 'actor') setAuditActorFilter('');

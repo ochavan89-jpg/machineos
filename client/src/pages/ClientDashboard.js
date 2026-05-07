@@ -10,7 +10,7 @@ import BookingCalendar from '../components/BookingCalendar';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { sendBookingConfirmation } from '../emailService';
 import { sendBookingNotifications, sendWalletNotification } from '../whatsappService';
-import { getMachines, createBooking, getWalletBalance, getMyBookingsPage, getTransactionsByUser } from '../supabaseService';
+import { getMachines, createBooking, getWalletBalance, getMyBookingsPage, getMyTransactionsPage } from '../supabaseService';
 import { appendUniqueById } from '../utils/pagination';
 
 const MACHINES = [];
@@ -30,6 +30,24 @@ const TRANSACTIONS = [
   { type: 'debit', desc: 'EXC-002 — Daily Settlement', date: '07 Apr 2026, 5:30 PM', amount: 12870, ref: 'BK002-SET' },
   { type: 'credit', desc: 'Wallet Recharge — NEFT', date: '01 Apr 2026, 11:00 AM', amount: 200000, ref: 'TXN8712340' },
 ];
+
+const formatTransactionRow = (tx) => {
+  const isCredit = String(tx?.type || '').toLowerCase() === 'credit';
+  const amount = Number(tx?.amount || 0);
+  const createdAt = tx?.created_at ? new Date(tx.created_at) : null;
+  const text = String(tx?.description || '').toLowerCase();
+  let status = 'captured';
+  if (text.includes('[failed]')) status = 'failed';
+  else if (text.includes('[reversed]') || text.includes('refund')) status = 'reversed';
+  return {
+    type: isCredit ? 'credit' : 'debit',
+    desc: tx?.description || (isCredit ? 'Wallet Credit' : 'Wallet Debit'),
+    date: createdAt ? createdAt.toLocaleString('en-IN') : 'N/A',
+    amount,
+    ref: tx?.reference || 'N/A',
+    status,
+  };
+};
 
 const NAV = [
   { id: 'book', icon: String.fromCodePoint(0x1F69C), label: 'Book Machine', i18nKey: 'bookMachine' },
@@ -147,8 +165,16 @@ const ClientDashboard = () => {
   const [bookingsOffset, setBookingsOffset] = useState(0);
   const [bookingsHasMore, setBookingsHasMore] = useState(false);
   const [bookingsLoadingMore, setBookingsLoadingMore] = useState(false);
+  const [transactionRows, setTransactionRows] = useState(TRANSACTIONS);
+  const [transactionFilter, setTransactionFilter] = useState('all');
 
   const user = JSON.parse(localStorage.getItem('machineos_user') || '{}');
+  const handleLogout = () => {
+    localStorage.removeItem('machineos_user');
+    localStorage.removeItem('machineos_token');
+    localStorage.removeItem('machineos_refresh_token');
+    navigate('/login', { replace: true });
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -168,6 +194,10 @@ const ClientDashboard = () => {
       if (user?.id) {
         const bal = await getWalletBalance(user.id);
         setWalletBalance(bal);
+        const txResult = await getMyTransactionsPage({ limit: 100, offset: 0 });
+        if ((txResult.items || []).length > 0) {
+          setTransactionRows(txResult.items.map(formatTransactionRow));
+        }
       }
     };
     loadData();
@@ -178,7 +208,6 @@ const ClientDashboard = () => {
         setBookingsHasMore(Boolean(result.hasMore));
         setBookingsOffset(result.nextOffset || 0);
       });
-      getTransactionsByUser(savedUser.id).catch(() => {});
     }
 
     const walletInterval = setInterval(async () => {
@@ -192,6 +221,11 @@ const ClientDashboard = () => {
   }, []); // eslint-disable-line
 
   const displayMachines = machineList.length > 0 ? machineList : MACHINES;
+  const filteredTransactions = transactionRows.filter((row) => {
+    if (transactionFilter === 'credit') return row.type === 'credit';
+    if (transactionFilter === 'debit') return row.type === 'debit';
+    return true;
+  });
 
   const calcAdvance = (machine, type) => {
     if (!machine) return 0;
@@ -345,7 +379,7 @@ alert(`${String.fromCodePoint(0x2705)} ${t('paymentSuccess')}\nRs.${amt.toLocale
             </div>
           }
           bottomContent={
-            <button style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(233,69,96,0.3)', background: 'rgba(233,69,96,0.08)', color: '#e94560', cursor: 'pointer', fontSize: '13px', width: '100%' }} onClick={() => navigate('/')}>{t('logout')}</button>
+            <button style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(233,69,96,0.3)', background: 'rgba(233,69,96,0.08)', color: '#e94560', cursor: 'pointer', fontSize: '13px', width: '100%' }} onClick={handleLogout}>{t('logout')}</button>
           }
         />
       )}
@@ -375,7 +409,7 @@ alert(`${String.fromCodePoint(0x2705)} ${t('paymentSuccess')}\nRs.${amt.toLocale
           <div style={s.warningBox} onClick={() => setShowBlacklistWarning(true)}>
             <p style={s.warningText}>Direct Contact = Blacklist</p>
           </div>
-          <button style={s.logoutBtn} onClick={() => navigate('/')}>{t('logout')}</button>
+          <button style={s.logoutBtn} onClick={handleLogout}>{t('logout')}</button>
           <p style={s.sidebarFooter}>{t('sinceExcellence')}</p>
         </div>
       )}
@@ -702,8 +736,33 @@ alert(`${String.fromCodePoint(0x2705)} ${t('paymentSuccess')}\nRs.${amt.toLocale
               </div>
             </div>
             <div style={{ background: 'linear-gradient(135deg, #0f2040, #0a1628)', border: '1px solid rgba(201,168,76,0.2)', borderRadius: '16px', padding: '25px' }}>
-              <h3 style={{ color: '#c9a84c', margin: '0 0 15px', fontSize: '15px' }}>{t('transactionHistoryTitle')}</h3>
-              {TRANSACTIONS.map((t, i) => (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', marginBottom: '12px', flexWrap: 'wrap' }}>
+                <h3 style={{ color: '#c9a84c', margin: 0, fontSize: '15px' }}>{t('transactionHistoryTitle')}</h3>
+                <div style={{ display: 'flex', gap: '6px' }}>
+                  {[
+                    { id: 'all', label: 'All' },
+                    { id: 'credit', label: 'Credit' },
+                    { id: 'debit', label: 'Debit' },
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => setTransactionFilter(opt.id)}
+                      style={{
+                        background: transactionFilter === opt.id ? 'rgba(201,168,76,0.2)' : 'rgba(201,168,76,0.08)',
+                        border: transactionFilter === opt.id ? '1px solid rgba(201,168,76,0.45)' : '1px solid rgba(201,168,76,0.25)',
+                        color: '#c9a84c',
+                        borderRadius: '14px',
+                        padding: '4px 10px',
+                        fontSize: '10px',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {filteredTransactions.map((t, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                   <div style={{ width: '34px', height: '34px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px', flexShrink: 0, background: t.type === 'credit' ? 'rgba(76,175,80,0.15)' : 'rgba(233,69,96,0.15)', color: t.type === 'credit' ? '#4CAF50' : '#e94560', fontWeight: '700' }}>
                     {t.type === 'credit' ? '+' : '-'}
@@ -712,11 +771,17 @@ alert(`${String.fromCodePoint(0x2705)} ${t('paymentSuccess')}\nRs.${amt.toLocale
                     <p style={{ color: '#e8e0d0', fontSize: '11px', margin: '0 0 2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.desc}</p>
                     <p style={{ color: '#8896a8', fontSize: '10px', margin: 0 }}>{t.date}</p>
                   </div>
+                  <span style={{ color: t.status === 'failed' ? '#e94560' : t.status === 'reversed' ? '#FF9800' : '#4CAF50', fontSize: '10px', minWidth: '64px', textAlign: 'right' }}>
+                    {t.status}
+                  </span>
                   <p style={{ color: t.type === 'credit' ? '#4CAF50' : '#e94560', fontWeight: '700', fontSize: '13px', margin: 0, flexShrink: 0 }}>
                     {t.type === 'credit' ? '+' : '-'}Rs.{t.amount.toLocaleString('en-IN')}
                   </p>
                 </div>
               ))}
+              {filteredTransactions.length === 0 && (
+                <p style={{ color: '#8896a8', fontSize: '11px', textAlign: 'center', margin: '14px 0 4px' }}>No transactions for selected filter.</p>
+              )}
             </div>
           </div>
         )}

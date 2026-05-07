@@ -92,6 +92,12 @@ const OperatorDashboard = () => {
   const [fuelOffset, setFuelOffset] = useState(0);
   const [fuelHasMore, setFuelHasMore] = useState(false);
   const [fuelLoadingMore, setFuelLoadingMore] = useState(false);
+  const handleLogout = () => {
+    localStorage.removeItem('machineos_user');
+    localStorage.removeItem('machineos_token');
+    localStorage.removeItem('machineos_refresh_token');
+    navigate('/login', { replace: true });
+  };
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -293,7 +299,7 @@ const OperatorDashboard = () => {
 
                 {/* Logout */}
                 <div style={{ padding: '12px 16px' }}>
-                  <button style={s.drawerLogout} onClick={() => navigate('/')}>
+                  <button style={s.drawerLogout} onClick={handleLogout}>
                     🚪 {t('logout')}
                   </button>
                 </div>
@@ -350,7 +356,7 @@ const OperatorDashboard = () => {
             </div>
             <p style={{ ...s.msLabel, color: fuelColor }}>{String.fromCodePoint(0x26FD)} Fuel: {fuelLevel}%</p>
           </div>
-          <button style={s.logoutBtn} onClick={() => navigate('/')}>🚪 {t('logout')}</button>
+          <button style={s.logoutBtn} onClick={handleLogout}>🚪 {t('logout')}</button>
           <p style={s.sidebarFooter}>{t('sinceExcellence')}</p>
         </div>
       )}

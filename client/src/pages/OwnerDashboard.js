@@ -8,7 +8,7 @@ import { generateOwnerReceipt } from '../services/pdfGenerator';
 import MobileNav from '../components/MobileNav';
 import { useWindowSize } from '../hooks/useWindowSize';
 import { getOwnerBookingsPage, approveBooking } from '../supabaseService';
-import { getMachines, getAllBookings } from '../supabaseService';
+import { getMachines } from '../supabaseService';
 import { appendUniqueById } from '../utils/pagination';
 
 const OWNER_DATA = {
@@ -165,11 +165,13 @@ const OwnerDashboard = () => {
 
   useEffect(() => {
     const loadData = async () => {
+      const sessionUser = JSON.parse(localStorage.getItem('machineos_user') || '{}');
+      if (sessionUser?.role !== 'owner') {
+        navigate(`/${sessionUser?.role || 'login'}`, { replace: true });
+        return;
+      }
       const machines = await getMachines();
       setMachineData(machines || []);
-      // eslint-disable-next-line no-unused-vars
-      const bookings = await getAllBookings();
-      // setBookingData(bookings);
     };
     loadData();
     getOwnerBookingsPage({ limit: 100, offset: 0 }).then((result) => {
@@ -177,7 +179,7 @@ const OwnerDashboard = () => {
       setOwnerBookingsHasMore(Boolean(result.hasMore));
       setOwnerBookingsOffset(result.nextOffset || 0);
     });
-  }, []);
+  }, [navigate]);
   const loadMoreOwnerBookings = async () => {
     if (!ownerBookingsHasMore || ownerBookingsLoadingMore) return;
     setOwnerBookingsLoadingMore(true);
@@ -201,6 +203,12 @@ const OwnerDashboard = () => {
   const totalGross = PAYMENT_HISTORY.reduce((a, b) => a + b.gross, 0);
   const totalNet = PAYMENT_HISTORY.reduce((a, b) => a + b.net, 0);
   const totalCommission = PAYMENT_HISTORY.reduce((a, b) => a + b.commission, 0);
+  const handleLogout = () => {
+    localStorage.removeItem('machineos_user');
+    localStorage.removeItem('machineos_token');
+    localStorage.removeItem('machineos_refresh_token');
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div style={s.container}>
@@ -219,7 +227,7 @@ const OwnerDashboard = () => {
             </div>
           }
           bottomContent={
-            <button style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(233,69,96,0.3)', background: 'rgba(233,69,96,0.08)', color: '#e94560', cursor: 'pointer', fontSize: '13px', width: '100%' }} onClick={() => navigate('/')}>🚪 {t('logout')}</button>
+            <button style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(233,69,96,0.3)', background: 'rgba(233,69,96,0.08)', color: '#e94560', cursor: 'pointer', fontSize: '13px', width: '100%' }} onClick={handleLogout}>🚪 {t('logout')}</button>
           }
         />
       )}
@@ -249,7 +257,7 @@ const OwnerDashboard = () => {
             </button>
           ))}
           <div style={s.divider} />
-          <button style={s.logoutBtn} onClick={() => navigate('/')}>🚪 {t('logout')}</button>
+          <button style={s.logoutBtn} onClick={handleLogout}>🚪 {t('logout')}</button>
           <p style={s.sidebarFooter}>{t('sinceExcellence')}</p>
         </div>
       )}
