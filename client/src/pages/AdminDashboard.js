@@ -204,6 +204,8 @@ const AdminDashboard = () => {
   const [auditCursor, setAuditCursor] = useState(null);
   const [auditHasMore, setAuditHasMore] = useState(false);
   const [auditLoadingMore, setAuditLoadingMore] = useState(false);
+  const [auditFromPickerOpen, setAuditFromPickerOpen] = useState(false);
+  const [auditToPickerOpen, setAuditToPickerOpen] = useState(false);
   const [auditPresetActive, setAuditPresetActive] = useState('');
   const [selectedDlqItem, setSelectedDlqItem] = useState(null);
   const [dlqRetryReason, setDlqRetryReason] = useState('');
@@ -231,6 +233,8 @@ const AdminDashboard = () => {
   const [securityLastRefreshedAt, setSecurityLastRefreshedAt] = useState(null);
   const [securityNow, setSecurityNow] = useState(Date.now());
   const [securityPanelMessage, setSecurityPanelMessage] = useState('');
+  const auditFromInputRef = useRef(null);
+  const auditToInputRef = useRef(null);
   const getCurrentAdminId = () => {
     try {
       const user = JSON.parse(localStorage.getItem('machineos_user') || '{}');
@@ -977,6 +981,10 @@ const AdminDashboard = () => {
         @keyframes auditShimmerSweep {
           0% { background-position: -160% 0; }
           100% { background-position: 190% 0; }
+        }
+        @keyframes auditSoftOpen {
+          0% { opacity: 0.72; transform: translateY(2px) scale(0.985); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}</style>
       {isSmall && (
@@ -1901,18 +1909,52 @@ const AdminDashboard = () => {
                 placeholder="Search metadata JSON"
                 style={auditCmdInputStyle}
               />
-              <input
-                type="datetime-local"
-                value={auditFrom}
-                onChange={(e) => setAuditFrom(e.target.value)}
-                style={auditCmdInputStyle}
-              />
-              <input
-                type="datetime-local"
-                value={auditTo}
-                onChange={(e) => setAuditTo(e.target.value)}
-                style={auditCmdInputStyle}
-              />
+              <div style={{ position: 'relative', minWidth: '188px', animation: 'auditSoftOpen 260ms ease' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuditFromPickerOpen(true);
+                    setTimeout(() => setAuditFromPickerOpen(false), 320);
+                    openDatePicker(auditFromInputRef);
+                  }}
+                  style={{ ...auditCmdInputStyle, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                  title="From datetime"
+                >
+                  <span>{auditFrom || 'From date & time'}</span>
+                  <span style={{ color: '#f5d88a', fontSize: '11px', transform: auditFromPickerOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 220ms ease' }}>▼</span>
+                </button>
+                <input
+                  ref={auditFromInputRef}
+                  type="datetime-local"
+                  value={auditFrom}
+                  onChange={(e) => setAuditFrom(e.target.value)}
+                  style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}
+                  tabIndex={-1}
+                />
+              </div>
+              <div style={{ position: 'relative', minWidth: '188px', animation: 'auditSoftOpen 260ms ease' }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuditToPickerOpen(true);
+                    setTimeout(() => setAuditToPickerOpen(false), 320);
+                    openDatePicker(auditToInputRef);
+                  }}
+                  style={{ ...auditCmdInputStyle, width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+                  title="To datetime"
+                >
+                  <span>{auditTo || 'To date & time'}</span>
+                  <span style={{ color: '#f5d88a', fontSize: '11px', transform: auditToPickerOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 220ms ease' }}>▼</span>
+                </button>
+                <input
+                  ref={auditToInputRef}
+                  type="datetime-local"
+                  value={auditTo}
+                  onChange={(e) => setAuditTo(e.target.value)}
+                  style={{ position: 'absolute', width: '1px', height: '1px', opacity: 0, pointerEvents: 'none' }}
+                  tabIndex={-1}
+                />
+              </div>
               <button style={{ ...auditCmdButtonStyle, ...(auditPresetActive === 'today' ? { border: '1px solid rgba(245,216,138,0.9)', boxShadow: '0 10px 20px rgba(0,0,0,0.35), 0 0 14px rgba(201,168,76,0.4)' } : {}) }} onClick={() => setAuditPreset('today')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>{t('todayText')}</button>
               <button style={{ ...auditCmdButtonStyle, ...(auditPresetActive === '24h' ? { border: '1px solid rgba(245,216,138,0.9)', boxShadow: '0 10px 20px rgba(0,0,0,0.35), 0 0 14px rgba(201,168,76,0.4)' } : {}) }} onClick={() => setAuditPreset('24h')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>24h</button>
               <button style={{ ...auditCmdButtonStyle, ...(auditPresetActive === '7d' ? { border: '1px solid rgba(245,216,138,0.9)', boxShadow: '0 10px 20px rgba(0,0,0,0.35), 0 0 14px rgba(201,168,76,0.4)' } : {}) }} onClick={() => setAuditPreset('7d')} onMouseEnter={handleAuditCmdHover} onMouseLeave={handleAuditCmdLeave} onMouseDown={handleAuditCmdDown} onMouseUp={handleAuditCmdUp}>7d</button>
