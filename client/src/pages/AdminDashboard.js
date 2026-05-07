@@ -158,6 +158,8 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
 
   const [machineData, setMachineData] = useState([]);
+  const [machineStatusGroupMode, setMachineStatusGroupMode] = useState('hour');
+  const [openMachineStatusGroups, setOpenMachineStatusGroups] = useState({});
   const [bookingData, setBookingData] = useState([]);
   const [userData, setUserData] = useState([]);
   const [transactionData, setTransactionData] = useState([]);
@@ -604,6 +606,40 @@ const AdminDashboard = () => {
   const totalRevenue = bookingData.reduce((a, b) => a + (b.base_amount || 0), 0);
   const commission = Math.round(totalRevenue * 0.15);
   const lowFuelMachines = machineData.filter(m => (m.fuel_level || 0) < 30);
+  const machineStatusGroups = useMemo(() => {
+    const toDate = (m) => {
+      const raw = m?.updated_at || m?.last_seen_at || m?.created_at || null;
+      if (!raw) return null;
+      const parsed = new Date(raw);
+      return Number.isNaN(parsed.getTime()) ? null : parsed;
+    };
+    const bucket = {};
+    (machineData || []).forEach((m) => {
+      const dt = toDate(m);
+      const key = dt
+        ? (machineStatusGroupMode === 'day'
+          ? `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`
+          : `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')} ${String(dt.getHours()).padStart(2, '0')}:00`)
+        : 'unknown';
+      if (!bucket[key]) bucket[key] = [];
+      bucket[key].push(m);
+    });
+    return Object.entries(bucket)
+      .sort((a, b) => String(b[0]).localeCompare(String(a[0])))
+      .map(([key, rows]) => {
+        let label = 'Unknown Time';
+        if (key !== 'unknown') {
+          if (machineStatusGroupMode === 'day') {
+            label = new Date(`${key}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+          } else {
+            const normalized = key.replace(' ', 'T');
+            label = new Date(`${normalized}:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) + ` · ${key.slice(-5)}`;
+          }
+        }
+        const activeCount = rows.filter((x) => String(x?.status || '').toLowerCase() === 'active').length;
+        return { key, label, rows, activeCount };
+      });
+  }, [machineData, machineStatusGroupMode]);
   const visibleAuditLogs = auditLogs;
   const auditRoleCounts = useMemo(() => {
     const counts = { admin: 0, owner: 0, client: 0, operator: 0, unknown: 0 };
@@ -867,6 +903,17 @@ const AdminDashboard = () => {
   const blockedRate = (rateTelemetry.allowed + rateTelemetry.blocked) > 0
     ? Math.round((rateTelemetry.blocked / (rateTelemetry.allowed + rateTelemetry.blocked)) * 100)
     : 0;
+  const topRoute = useMemo(() => {
+    const rows = rateTelemetry.byRoute || [];
+    if (!rows.length) return null;
+    return rows.reduce((best, current) => ((current.count || 0) > (best.count || 0) ? current : best), rows[0]);
+  }, [rateTelemetry.byRoute]);
+  const telemetryRiskScore = useMemo(() => {
+    const blockedWeight = Math.min(100, blockedRate * 4);
+    const bucketWeight = Math.min(100, (rateTelemetry.activeBuckets || 0) * 3);
+    return Math.round((blockedWeight * 0.65) + (bucketWeight * 0.35));
+  }, [blockedRate, rateTelemetry.activeBuckets]);
+  const telemetryHealth = telemetryRiskScore >= 75 ? 'Critical' : telemetryRiskScore >= 45 ? 'Warning' : 'Healthy';
   const topFailedLogins = (failedLogins || []).slice(0, 6);
   const failedByIp = useMemo(() => {
     const bucket = {};
@@ -927,6 +974,19 @@ const AdminDashboard = () => {
       return next;
     });
   }, [securitySignalGroups]);
+  useEffect(() => {
+    if (!machineStatusGroups.length) {
+      setOpenMachineStatusGroups({});
+      return;
+    }
+    setOpenMachineStatusGroups((prev) => {
+      const next = {};
+      machineStatusGroups.forEach((g, idx) => {
+        next[g.key] = Object.prototype.hasOwnProperty.call(prev, g.key) ? prev[g.key] : idx === 0;
+      });
+      return next;
+    });
+  }, [machineStatusGroups]);
   const exportSecuritySignalsCsv = () => {
     if (visibleSecuritySignals.length === 0) return;
     const header = ['signal_id', 'action', 'severity', 'created_at', 'acknowledged', 'acknowledged_by', 'acknowledged_at'];
@@ -1165,41 +1225,70 @@ const AdminDashboard = () => {
             </div>
 
             <div style={s.tableCard}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px', gap: '8px', flexWrap: 'wrap' }}>
                 <h3 style={s.tableTitle}>🚜 Live Machine Status</h3>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
                   <span style={s.liveDot}></span>
                   <span style={{ color: '#4CAF50', fontSize: '11px', fontWeight: '700' }}>LIVE</span>
+                  <button
+                    type="button"
+                    onClick={() => setMachineStatusGroupMode('hour')}
+                    style={{ background: machineStatusGroupMode === 'hour' ? 'rgba(109,190,255,0.2)' : 'rgba(109,190,255,0.08)', border: machineStatusGroupMode === 'hour' ? '1px solid rgba(109,190,255,0.5)' : '1px solid rgba(109,190,255,0.28)', color: '#8dd3ff', borderRadius: '12px', padding: '2px 8px', fontSize: '10px', cursor: 'pointer' }}
+                  >
+                    Hour-wise
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMachineStatusGroupMode('day')}
+                    style={{ background: machineStatusGroupMode === 'day' ? 'rgba(109,190,255,0.2)' : 'rgba(109,190,255,0.08)', border: machineStatusGroupMode === 'day' ? '1px solid rgba(109,190,255,0.5)' : '1px solid rgba(109,190,255,0.28)', color: '#8dd3ff', borderRadius: '12px', padding: '2px 8px', fontSize: '10px', cursor: 'pointer' }}
+                  >
+                    Day-wise
+                  </button>
                 </div>
               </div>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={s.table}>
-                  <thead>
-                    <tr>{['Machine', 'Type', 'Location', 'Fuel %', 'Rate/Day', 'Status'].map(h => (
-                      <th key={h} style={s.th}>{h}</th>
-                    ))}</tr>
-                  </thead>
-                  <tbody>
-                    {machineData.map((m, i) => (
-                      <tr key={i} style={s.tr}>
-                        <td style={s.td}><span style={s.machineTag}>{m.machine_id}</span></td>
-                        <td style={s.td}>{m.type || 'N/A'}</td>
-                        <td style={s.td}>📍 {m.location}</td>
-                        <td style={s.td}>
-                          <div style={s.fuelBar}>
-                            <div style={{ ...s.fuelFill, width: (m.fuel_level || 0) + '%', background: (m.fuel_level || 0) > 30 ? '#4CAF50' : '#e94560' }}></div>
+              {machineStatusGroups.length === 0 ? (
+                <p style={{ color: '#8896a8', textAlign: 'center', padding: '20px' }}>No machine telemetry available.</p>
+              ) : machineStatusGroups.map((group) => {
+                const isOpen = Boolean(openMachineStatusGroups[group.key]);
+                return (
+                  <div key={group.key} style={{ border: '1px solid rgba(201,168,76,0.22)', borderRadius: '10px', marginBottom: '8px', background: 'rgba(0,0,0,0.2)' }}>
+                    <button
+                      type="button"
+                      onClick={() => setOpenMachineStatusGroups((prev) => ({ ...prev, [group.key]: !prev[group.key] }))}
+                      style={{ width: '100%', background: 'linear-gradient(165deg, rgba(16,30,48,0.9), rgba(9,16,28,0.92))', border: 'none', borderBottom: isOpen ? '1px solid rgba(201,168,76,0.2)' : 'none', color: '#e8e0d0', borderRadius: isOpen ? '10px 10px 0 0' : '10px', padding: '9px 10px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ color: '#f3db99', fontWeight: 700, fontSize: '12px' }}>{group.label}</span>
+                        <span style={{ color: '#8ea2b8', fontSize: '10px' }}>{group.rows.length} machines</span>
+                        <span style={{ color: '#9fe3be', fontSize: '10px', border: '1px solid rgba(76,175,80,0.4)', borderRadius: '999px', padding: '1px 6px', background: 'rgba(76,175,80,0.12)' }}>Active {group.activeCount}</span>
+                      </span>
+                      <span style={{ color: '#c9a84c', fontSize: '11px' }}>{isOpen ? '▲' : '▼'}</span>
+                    </button>
+                    {isOpen && (
+                      <div style={{ padding: '8px', display: 'grid', gridTemplateColumns: isSmall ? '1fr' : 'repeat(2, 1fr)', gap: '8px' }}>
+                        {group.rows.map((m, i) => (
+                          <div key={`${m.machine_id || 'machine'}-${i}`} style={{ border: '1px solid rgba(201,168,76,0.18)', borderRadius: '10px', padding: '10px', background: 'linear-gradient(160deg, rgba(14,25,40,0.88), rgba(8,14,24,0.92))' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                              <span style={s.machineTag}>{m.machine_id}</span>
+                              <span style={{ background: m.status === 'Active' ? 'rgba(76,175,80,0.15)' : 'rgba(233,69,96,0.15)', color: m.status === 'Active' ? '#4CAF50' : '#e94560', padding: '3px 8px', borderRadius: '20px', fontSize: '11px' }}>{m.status}</span>
+                            </div>
+                            <p style={{ color: '#8896a8', fontSize: '11px', margin: '0 0 6px' }}>{m.type || 'N/A'} · 📍 {m.location || 'N/A'}</p>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                              <div style={{ flex: 1 }}>
+                                <div style={s.fuelBar}>
+                                  <div style={{ ...s.fuelFill, width: `${m.fuel_level || 0}%`, background: (m.fuel_level || 0) > 30 ? '#4CAF50' : '#e94560' }} />
+                                </div>
+                                <span style={{ color: (m.fuel_level || 0) > 30 ? '#4CAF50' : '#e94560', fontSize: '12px' }}>{m.fuel_level || 0}% fuel</span>
+                              </div>
+                              <span style={{ color: '#c9a84c', fontSize: '12px', fontWeight: 700 }}>Rs.{(m.rate_per_day || 0).toLocaleString('en-IN')}</span>
+                            </div>
                           </div>
-                          <span style={{ color: (m.fuel_level || 0) > 30 ? '#4CAF50' : '#e94560', fontSize: '12px' }}>{m.fuel_level || 0}%</span>
-                        </td>
-                        <td style={s.td}>Rs.{(m.rate_per_day || 0).toLocaleString('en-IN')}</td>
-                        <td style={s.td}>
-                          <span style={{ background: m.status === 'Active' ? 'rgba(76,175,80,0.15)' : 'rgba(233,69,96,0.15)', color: m.status === 'Active' ? '#4CAF50' : '#e94560', padding: '3px 8px', borderRadius: '20px', fontSize: '11px' }}>{m.status}</span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div style={{ ...s.bottomRow, gridTemplateColumns: isSmall ? '1fr' : '1fr 1fr' }}>
@@ -1411,18 +1500,22 @@ const AdminDashboard = () => {
               </div>
               <div style={s.bottomCard}>
                 <h3 style={s.bottomTitle}>📈 {t('rateLimitTelemetryTitle')}</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: '8px', marginBottom: '10px' }}>
-                  <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isSmall ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: '8px', marginBottom: '10px' }}>
+                  <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px', textAlign: 'center', border: '1px solid rgba(76,175,80,0.28)' }}>
                     <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>{t('allowedText')}</p>
                     <p style={{ color: '#4CAF50', margin: 0, fontWeight: '700' }}>{rateTelemetry.allowed || 0}</p>
                   </div>
-                  <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                  <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px', textAlign: 'center', border: '1px solid rgba(233,69,96,0.28)' }}>
                     <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>{t('blockedText')}</p>
                     <p style={{ color: '#e94560', margin: 0, fontWeight: '700' }}>{rateTelemetry.blocked || 0}</p>
                   </div>
-                  <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                  <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px', textAlign: 'center', border: '1px solid rgba(201,168,76,0.28)' }}>
                     <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>{t('activeBucketsText')}</p>
                     <p style={{ color: '#c9a84c', margin: 0, fontWeight: '700' }}>{rateTelemetry.activeBuckets || 0}</p>
+                  </div>
+                  <div style={{ background: 'rgba(0,0,0,0.3)', borderRadius: '8px', padding: '8px', textAlign: 'center', border: telemetryHealth === 'Critical' ? '1px solid rgba(233,69,96,0.38)' : telemetryHealth === 'Warning' ? '1px solid rgba(255,152,0,0.38)' : '1px solid rgba(76,175,80,0.38)' }}>
+                    <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 3px' }}>Risk Score</p>
+                    <p style={{ color: telemetryHealth === 'Critical' ? '#ff9aa8' : telemetryHealth === 'Warning' ? '#FFB74D' : '#4CAF50', margin: 0, fontWeight: '700' }}>{telemetryRiskScore}</p>
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '10px' }}>
@@ -1437,7 +1530,23 @@ const AdminDashboard = () => {
                   }}>
                     {blockedRate >= 15 ? t('alertText') : t('normalText')}
                   </span>
+                  <span style={{
+                    border: telemetryHealth === 'Critical' ? '1px solid rgba(233,69,96,0.45)' : telemetryHealth === 'Warning' ? '1px solid rgba(255,152,0,0.45)' : '1px solid rgba(76,175,80,0.45)',
+                    color: telemetryHealth === 'Critical' ? '#ff9aa8' : telemetryHealth === 'Warning' ? '#FFB74D' : '#4CAF50',
+                    background: telemetryHealth === 'Critical' ? 'rgba(233,69,96,0.14)' : telemetryHealth === 'Warning' ? 'rgba(255,152,0,0.14)' : 'rgba(76,175,80,0.14)',
+                    borderRadius: '10px',
+                    padding: '2px 8px',
+                    fontSize: '10px',
+                  }}>
+                    {telemetryHealth}
+                  </span>
                 </div>
+                {topRoute && (
+                  <div style={{ marginBottom: '10px', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '8px', border: '1px solid rgba(201,168,76,0.18)' }}>
+                    <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 4px' }}>Top Route Pressure</p>
+                    <p style={{ color: '#e8e0d0', fontSize: '11px', margin: 0 }}>{topRoute.route} · hits: {topRoute.count || 0}</p>
+                  </div>
+                )}
                 <div style={{ marginBottom: '10px', background: 'rgba(0,0,0,0.25)', borderRadius: '8px', padding: '8px' }}>
                   <p style={{ color: '#8896a8', fontSize: '10px', margin: '0 0 4px' }}>{t('apiHealthTitle')} ({Math.round((apiHealthTelemetry.windowMs || 0) / 60000)}m)</p>
                   <p style={{ color: '#e8e0d0', fontSize: '11px', margin: '0 0 2px' }}>
