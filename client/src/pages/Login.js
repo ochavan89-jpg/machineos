@@ -281,14 +281,6 @@ const Login = () => {
             border-top: 1px solid rgba(255,255,255,0.06);
             backdrop-filter: blur(8px);
           }
-          .lux-input {
-            transition: border-color 0.22s ease, box-shadow 0.22s ease, background 0.22s ease;
-          }
-          .lux-input:focus {
-            border-color: rgba(201,168,76,0.72) !important;
-            background: rgba(6,14,27,0.95) !important;
-            box-shadow: 0 0 0 2px rgba(201,168,76,0.16), 0 8px 24px rgba(0,0,0,0.35);
-          }
           @keyframes role-float {
             0%, 100% { transform: translateY(0px); }
             50% { transform: translateY(-5px); }
@@ -348,7 +340,7 @@ const Login = () => {
             <p style={s.cardSub}>{t('platform')}</p>
           </div>
 
-          <p style={s.roleSectionLabel}>{t('selectRole')}</p>
+          <p style={s.label}>{t('selectRole')}:</p>
           <div style={s.roleGrid} className="premium-role-grid">
             {ROLES.map(r => (
               <button key={r.id}
@@ -385,10 +377,8 @@ const Login = () => {
                       if (fallback) fallback.style.display = 'flex';
                     }}
                   />
-                  <span style={s.roleImageShade}></span>
                   <span style={s.roleImageFallback}>{r.fallback}</span>
                   <span style={s.roleGlow}></span>
-                  <span style={s.roleBadge}>{r.fallback}</span>
                   <span
                     style={{
                       ...s.roleReflection,
@@ -414,7 +404,6 @@ const Login = () => {
           <div style={s.fieldGroup}>
             <label style={s.label}>{loginUsesPhone ? t('mobileNumber') : t('emailAddressLabel')}</label>
             <input
-              className="lux-input"
               style={s.input}
               type={loginUsesPhone ? 'tel' : 'email'}
               inputMode={loginUsesPhone ? 'numeric' : 'email'}
@@ -433,7 +422,6 @@ const Login = () => {
             <label style={s.label}>Password</label>
             <div style={s.passwordWrap}>
               <input
-                className="lux-input"
                 style={{ ...s.input, paddingRight: '74px' }}
                 type={showPassword ? 'text' : 'password'}
                 placeholder="password"
@@ -561,13 +549,12 @@ const s = {
   companyName: { color: '#c9a84c', fontSize: '18px', fontWeight: '900', margin: '0 0 3px', letterSpacing: '2px' },
   tagline: { color: 'rgba(201,168,76,0.6)', fontSize: '9px', margin: '0 0 2px', letterSpacing: '2px' },
   since: { color: '#8896a8', fontSize: '10px', margin: 0 },
-  card: { background: 'radial-gradient(circle at 16% 4%, rgba(29,54,99,0.7) 0%, rgba(10,22,43,0.94) 36%, rgba(5,12,24,0.98) 100%)', border: '1px solid rgba(201,168,76,0.34)', borderRadius: '28px', padding: '32px 34px', boxShadow: '0 34px 110px rgba(0,0,0,0.68), 0 0 76px rgba(201,168,76,0.08), inset 0 1px 0 rgba(255,255,255,0.12)' },
+  card: { background: 'radial-gradient(circle at 14% 2%, rgba(31,55,102,0.72) 0%, rgba(11,22,42,0.92) 35%, rgba(6,13,26,0.98) 100%)', border: '1px solid rgba(201,168,76,0.38)', borderRadius: '24px', padding: '32px', boxShadow: '0 34px 96px rgba(0,0,0,0.64), 0 0 60px rgba(201,168,76,0.09), inset 0 1px 0 rgba(255,255,255,0.12)' },
   cardHeader: { textAlign: 'center', marginBottom: '24px', paddingBottom: '20px', borderBottom: '1px solid rgba(201,168,76,0.1)' },
   cardTitle: { color: '#c9a84c', fontSize: '20px', fontWeight: '700', margin: '0 0 6px' },
   cardSub: { color: '#8896a8', fontSize: '12px', margin: 0 },
-  label: { color: '#9ba8bb', fontSize: '11px', marginBottom: '8px', letterSpacing: '1px', display: 'block' },
-  roleSectionLabel: { color: '#d7bc73', fontSize: '12px', marginBottom: '12px', letterSpacing: '2.2px', fontWeight: 700, textAlign: 'center', textTransform: 'uppercase' },
-  roleGrid: { marginBottom: '20px' },
+  label: { color: '#8896a8', fontSize: '11px', marginBottom: '8px', letterSpacing: '1px', display: 'block' },
+  roleGrid: { marginBottom: '18px' },
   roleBtn: {
     background: 'linear-gradient(165deg, rgba(19,35,66,0.68) 0%, rgba(8,16,31,0.93) 100%)',
     border: '1px solid rgba(201,168,76,0.27)',
@@ -580,27 +567,25 @@ const s = {
     WebkitBackdropFilter: 'blur(12px)',
     boxShadow: '0 16px 36px rgba(0,0,0,0.52), inset 0 1px 0 rgba(255,255,255,0.07)',
     isolation: 'isolate',
-    minHeight: '262px',
+    minHeight: '258px',
   },
   roleBtnActive: {
     background: 'linear-gradient(165deg, rgba(36,59,102,0.82) 0%, rgba(10,19,36,0.95) 100%)',
     border: '1px solid rgba(201,168,76,0.75)',
     boxShadow: '0 0 30px rgba(201,168,76,0.34), 0 20px 40px rgba(0,0,0,0.62), inset 0 1px 0 rgba(255,255,255,0.17)',
   },
-  roleImageWrap: { position: 'relative', width: '100%', height: '176px', margin: 0, borderRadius: '18px 18px 0 0', overflow: 'hidden', borderBottom: '1px solid rgba(201,168,76,0.22)', boxShadow: 'inset 0 -38px 80px rgba(2,6,14,0.52)', zIndex: 1 },
+  roleImageWrap: { position: 'relative', width: '100%', height: '178px', margin: 0, borderRadius: '18px 18px 0 0', overflow: 'hidden', borderBottom: '1px solid rgba(201,168,76,0.22)', boxShadow: 'inset 0 -30px 70px rgba(2,6,14,0.45)', zIndex: 1 },
   roleImage: { width: '100%', height: '100%', objectFit: 'cover', display: 'block', filter: 'saturate(1.12) contrast(1.08) brightness(0.93)' },
-  roleImageShade: { position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(2,6,14,0.02) 0%, rgba(3,8,18,0.22) 52%, rgba(3,8,18,0.75) 100%)', pointerEvents: 'none' },
   roleImageFallback: { position: 'absolute', inset: 0, display: 'none', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(135deg, #2d436e, #0a1628)', color: '#f2d78b', fontSize: '24px', fontWeight: '800' },
   roleGlow: { position: 'absolute', inset: '-16%', background: 'radial-gradient(circle at 50% 25%, rgba(201,168,76,0.24), rgba(12,24,45,0.12) 45%, transparent 72%)', pointerEvents: 'none' },
-  roleBadge: { position: 'absolute', left: '10px', bottom: '10px', width: '30px', height: '30px', borderRadius: '10px', border: '1px solid rgba(201,168,76,0.5)', background: 'rgba(7,16,32,0.78)', color: '#e7cd85', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: '800', backdropFilter: 'blur(5px)' },
   roleReflection: { position: 'absolute', inset: 0, pointerEvents: 'none', transition: 'background 0.12s linear' },
   roleLabel: { fontSize: '15px', fontWeight: '800', display: 'block', marginBottom: '5px', letterSpacing: '0.3px' },
   roleSub: { color: '#aebacf', fontSize: '11px', display: 'block', letterSpacing: '0.3px' },
-  selectedBadge: { display: 'flex', alignItems: 'center', gap: '8px', background: 'linear-gradient(135deg, rgba(15,30,58,0.62), rgba(7,16,30,0.88))', border: '1px solid rgba(201,168,76,0.18)', borderRadius: '10px', padding: '10px 12px', marginBottom: '18px', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)' },
+  selectedBadge: { display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(201,168,76,0.06)', border: '1px solid rgba(201,168,76,0.15)', borderRadius: '8px', padding: '8px 12px', marginBottom: '18px' },
   selectedDot: { width: '6px', height: '6px', background: '#4CAF50', borderRadius: '50%', flexShrink: 0 },
   selectedText: { color: '#8896a8', fontSize: '12px' },
   fieldGroup: { marginBottom: '14px' },
-  input: { width: '100%', padding: '12px 14px', background: 'linear-gradient(180deg, rgba(7,16,31,0.95), rgba(4,10,20,0.95))', border: '1px solid rgba(201,168,76,0.28)', borderRadius: '10px', color: '#fff', fontSize: '13px', boxSizing: 'border-box', outline: 'none', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)' },
+  input: { width: '100%', padding: '12px 14px', background: 'rgba(5,13,26,0.8)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '10px', color: '#fff', fontSize: '13px', boxSizing: 'border-box', outline: 'none' },
   modalInput: { width: '100%', padding: '10px 12px', background: 'rgba(5,13,26,0.8)', border: '1px solid rgba(201,168,76,0.3)', borderRadius: '8px', color: '#fff', fontSize: '13px', boxSizing: 'border-box', outline: 'none' },
   helperText: { color: '#8896a8', fontSize: '11px', margin: '6px 0 0' },
   fieldHint: { color: '#8896a8', fontSize: '11px', margin: '6px 0 0' },
